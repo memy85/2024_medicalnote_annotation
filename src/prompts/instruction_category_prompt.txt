@@ -1,0 +1,16 @@
+Given an instruction, along with an example input and output, classify the instruction based on the primary intent action it dictates.
+The possible categories and their descriptions are: Generation, Question Answering, Information Extraction, Natural Language Inference, Others.
+Instruction: Describe the process of bacterial conjugation and its significance in the context of antibiotic resistance.
+Category: Generation
+Instruction: Simplify the medical text to a level that can be easily understood by a non-medical professional or a layman.
+Category: Generation
+Instruction: Given a sentence, identify if there is an association between the given gene and disease. @GENE$ represents a gene and @DISEASE$ represents a disease. The label '1' indicates there is an association, while '0' indicates there is no association.
+Category: Information Extraction
+Instruction: From the provided symptoms, determine whether the issue is likely a migraine or a tension headache.
+Category: Question Answering
+Instruction: Determine whether a given statement is a causation or correlation based on the provided information.
+Category: Natural Language Inference
+Instruction: Calculate the Body Mass Index (BMI) for a specified individual based on provided weight and height details.
+Category: Others
+Instruction: {instruction}
+Category:

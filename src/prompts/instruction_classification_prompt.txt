@@ -1,0 +1,10 @@
+Given an instruction, along with an example input and output, classify the instruction based on the primary intent action it dictates. The possible categories and their descriptions are:
+Generation: The instruction primarily seeks to produce or generate new content or rewrite, summarize the content of the provided input.
+Question Answering: The instruction requires the model to generate a concise and accurate response to a provided query.
+Information Extraction: The instruction aims to extract specific pieces of data or information from provided input.
+Natural Language Inference: The instruction requests an analysis of relationships between statements or sentences, such as determining if one is an inference of the other.
+Others: Any instruction that does not fit into the aforementioned categories.
+Instruction: {instruction}
+Input: {input}
+Output: {output}
+Category:

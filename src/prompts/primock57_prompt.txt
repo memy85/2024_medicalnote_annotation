@@ -1,0 +1,18 @@
+Given a dialogue transcript of a primary care consultation between a clinician and a patient, write a consultation note base on that dialogue transcript.
+Input:
+Clinician: So, um, tell me what’s been going on. You’ve been saying there’s a problem with your hearing. Is that right?
+Patient: Yeah, so I just feel I can’t really hear as well as I used to, like my hearing is kind of deteriorating in some way.
+Clinician: Right, OK. How long has this been going on for?
+Patient: Uh about six weeks.
+Clinician: Six weeks, OK. Um, and before that have you had any hearing problem at all?
+Patient: Um I had something maybe, about a year ago, but it only lasted a couple of days, it wasn’t anything as long as this.
+Clinician: Right, OK, OK. And, um, in this six week period, have you had anything else happen? Have you had any other ear symptoms at all?
+Patient: Um, I occasionally get like a ringing in my left ear, uh just on the one side and um there’s actually been a few times when I felt kind of a bit sick or a bit dizzy as well.
+Response:
+History: Hx of difficulty hearing left ear for 6 weeks with tinnitus and slight nausea/ dizziness. One previous similar episode in the past- resolved spontaneously. No discharge/fever/itchiness/pain. Doesn’t use cotton wool buds. No Pmhx of note.
+Ex: Looks well, not in pain.
+Imp: need to exclude impacted wax in ear canal first.
+Pln: for face to face GP appointment in 5 days to examine ear. If any problems in interim to ring us back. Pt happy with and understands plan.
+Input:
+{dialogue}
+Response:

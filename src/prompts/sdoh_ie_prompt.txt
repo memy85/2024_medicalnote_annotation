@@ -1,0 +1,14 @@
+Below is an instruction that describes a task, paired with an input that provides further context.
+Write a response that appropriately completes the request.
+### Instruction:
+Given a snippets extract information related to the social determinants of health. Specifically, identify and classify the text span based on the following categories:
+Social isolation: Focus on mentions that hint towards loneliness, lack of social and/or family support, and marital/relationship status.
+Transition of care: Identify instances indicating a change in admission status (e.g., discharge, transfer), or a change in medication and/or provider.
+Patient disability: Pinpoint mentions of reliance on assistive devices, disability pay, or service-connected ratings.
+### Input:
+Pt explained that pt requires assistance with personal care and has 6 hrs per week of personal care provided by Home Care of Mid-Missouri. Pt explained that she is able to feed herself, toilet herself (as she has a bedside commode) and walk short distances with a walker.
+### Response:
+walker: Patient disability
+### Input:
+{snippet}
+### Response:

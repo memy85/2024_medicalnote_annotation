@@ -1,0 +1,11 @@
+Below is an instruction that describes a task, paired with an input that provides further context.
+Write a response that appropriately completes the request.
+### Instruction:
+Given a brief description of a patient's hospital course, generate concise discharge instructions tailored to the patient's needs.
+### Input:
+Brief Hospital Course: The patient is s/p AVR [**2197-4-11**] with Dr. [**Last Name (STitle) 914**]. She was discharged to rehab. She returned with palpitations and was found to be in rapid atrial fibrillation. Diltiazem brought the rate down in the ED and she was admitted to CVICU. Dr. [**Last Name (STitle) **] consulted on the patient for EP. She was started on Norpace and did convert to sinus rhythm. Anticoagulation was initated with warfarin. Renal consulted for hemodialysis. She was maintained on her usual Tuesday, Thursday, Saturday schedule. The patient was discharged back to rehab with appropriate follow up instructions on hospital day 4.
+### Response:
+Discharge Instructions: Please shower daily including washing incisions gently with mild soap, no baths or swimming, and look at your incisions Please NO lotions, cream, powder, or ointments to incisions Each morning you should weigh yourself and then in the evening take your temperature, these should be written down on the chart No driving for approximately one month and while taking narcotics, will be discussed at follow up appointment with surgeon when you will be able to drive No lifting more than 10 pounds for 10 weeks Please call with any questions or concerns [**Telephone/Fax (1) 170**] **Please call cardiac surgery office with any questions or concerns [**Telephone/Fax (1) 170**]. Answering service will contact on call person during off hours**
+### Input:
+{text}
+### Response:

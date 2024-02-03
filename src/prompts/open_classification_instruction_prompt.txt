@@ -1,0 +1,10 @@
+Given an instruction, along with an example input and output, please identify a suitable category for the instruction.
+Examples:
+Instruction: Given a medical treatment plan, provide a summary of its key components.
+Input: The patient will be administered 500mg of Amoxicillin thrice a day for 7 days, followed by physiotherapy sessions twice a week.
+Output: "The patient will take Amoxicillin for a week and undergo physiotherapy twice weekly."
+Category: Summary Generation
+Instruction: {instruction}
+Input: {input}
+Output: {output}
+Category:
