@@ -5,6 +5,7 @@ import os, sys
 import yaml
 
 CURRENT_FILE_PATH = Path(__file__).absolute()
+PROMPT_PATH = CURRENT_FILE_PATH.parents[1].joinpath('prompts')
 
 class Config :
 
@@ -18,8 +19,11 @@ class Config :
     def model_path(self, model_name) :
         return self.file['model_path'][model_name]
     
-    def template(self, template_type) :
-        return self.file['template'][template_type]
+    def template(self, topn, inference) :
+        template_path = PROMPT_PATH.joinpath(f'{inference}_{topn}.txt')
+        with open(template_path, 'r') as f :
+            template = f.read()
+        return template
     
     def get_data_path(self, dataset_name) :
         '''
@@ -49,4 +53,5 @@ def load_config() :
         config = yaml.load(f, yaml.SafeLoader)
 
     return Config(config)
+
 

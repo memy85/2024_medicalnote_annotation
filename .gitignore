@@ -1,2 +1,12 @@
 data
 config
+MedJEx
+sharmin_results
+models
+temporal-wiki-links-sample
+logs
+src/MedJEx
+src/__pycache__
+
+*.pyc
+__pycache__

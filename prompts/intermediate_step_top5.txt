@@ -1,0 +1,32 @@
+### Instruction:
+You are a helpful assistant, an expert in medical domain. 
+We give you a medical note(EHR note, in the context section) and the top 5 extracted symptoms/conditions or diagnosis, and the lab or tests that are related to it from a AI system. 
+Make sure that this is top 5 key terms, where smaller number entities has the highest priority.
+Based on the medical note and the extracted terms, refine the outputs :
+
+1. Read the EHR note and read the extracted outputs, and check if there are any terms that should be added or deleted.
+While doing so, make sure the extracted outputs are just as it is stated in the EHR note.
+
+2. If there are terms listed as None, then remove them. 
+
+3. Format the text as follows : 
+    1. key symptom or condition
+    1.1 medical test related to 1
+    1.2 medical test related to 1
+
+    2. key symptom or condition
+    2.1 medical test related to 2
+
+    3. key symptom or condition
+    3.1 medical test related to 3
+    3.2 medical test related to 3
+    ...
+
+
+### EHR note: 
+{context}
+
+### Extracted Terms :
+{extracted_terms}
+
+### Response:
