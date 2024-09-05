@@ -20,7 +20,7 @@ import io
 import json
 import torch
 import transformers
-# import utils
+from transformers import EarlyStoppingCallback, IntervalStrategy
 from torch.utils.data import Dataset
 from transformers import Trainer, AutoConfig 
 import typing
@@ -49,8 +49,6 @@ PROMPT_DICT = {
     ),
 }
 
-config = load_config()
-PROJECT_PATH = config.project_path
 # LOGGING_PATH = PROJECT_PATH.joinpath("logs/mistral)
 # logging.basicConfig()
 
@@ -104,6 +102,7 @@ class ModelArguments:
 @dataclass
 class DataArguments:
     data_path: str = field(default=None, metadata={"help": "Path to the training data."})
+    eval_data_path: str = field(default=None, metadata={"help" : "Path to the evaluation data."})
     num_samples_used: int = field(
         default=None,
         metadata={"help": "Number of samples used in the instructions data, default is all"},
@@ -119,6 +118,8 @@ class TrainingArguments(transformers.TrainingArguments):
         metadata={"help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."},
     )
     do_lora: bool = False
+    load_in_8bit: bool = False
+    load_best_model_at_end: bool = False
 
 
 @dataclass
@@ -265,15 +266,27 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer, dat
     """Make dataset and collator for supervised fine-tuning."""
     train_dataset = SupervisedDataset(tokenizer=tokenizer, data_path=data_args.data_path, num_samples_used=data_args.num_samples_used, category=data_args.category)
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
-    return dict(train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator)
+    if data_args.eval_data_path :
+        eval_dataset = SupervisedDataset(tokenizer=tokenizer, data_path=data_args.eval_data_path, num_samples_used=data_args.num_samples_used, category=data_args.category)
+        return dict(train_dataset=train_dataset, eval_dataset=eval_dataset, data_collator=data_collator)
+    else :
+        return dict(train_dataset=train_dataset, data_collator=data_collator)
 
 
-def train():
-    parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments, LoraArguments))
-    model_args, data_args, training_args, lora_args = parser.parse_args_into_dataclasses()
+def train(args = None):
+    if not args :
+        parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments, LoraArguments))
+        model_args, data_args, training_args, lora_args = parser.parse_args_into_dataclasses()
+    else :
+        parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments, LoraArguments))
+        model_args, data_args, training_args, lora_args = parser.parse_args_into_dataclasses(args.split())
+
+    project_config = load_config()
+    model_path = project_config.model_path(model_args.model_name_or_path)
 
     config = AutoConfig.from_pretrained(
-        model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+        # model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+        model_args.config_name if model_args.config_name else model_path,
         cache_dir=training_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
@@ -291,20 +304,22 @@ def train():
         )
     else:
         tokenizer = transformers.AutoTokenizer.from_pretrained(
-            model_args.model_name_or_path,
+            # model_args.model_name_or_path,
+            model_path,
             cache_dir=training_args.cache_dir,
             model_max_length=training_args.model_max_length,
             padding_side="right",
         )
 
     model = transformers.AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path,
+        # model_args.model_name_or_path,
+        model_path,
         cache_dir=training_args.cache_dir,
         config=config,
         device_map="auto",
-        load_in_8bit=True,
+        load_in_8bit=training_args.load_in_8bit,
     )
-    print("loaded model!")
+
     # if "llama" in model_args.model_name_or_path.lower() or "alpaca" in model_args.model_name_or_path.lower() or "vicuna" in model_args.model_name_or_path.lower():
     #     tokenizer.add_special_tokens({
     #         "eos_token": DEFAULT_EOS_TOKEN,
@@ -313,7 +328,9 @@ def train():
     #     })
     #     tokenizer.pad_token = tokenizer.eos_token
 
-    if "mistral" in  model_args.model_name_or_path.lower() or "pythia" in model_args.model_name_or_path.lower() or "rwkv" in model_args.model_name_or_path.lower() or "opt" in model_args.model_name_or_path.lower():
+    # if "mistral" in  model_args.model_name_or_path.lower() or "pythia" in model_args.model_name_or_path.lower() or "rwkv" in model_args.model_name_or_path.lower() or "opt" in model_args.model_name_or_path.lower():
+
+    if "mistral" in  model_path.lower() or "pythia" in model_path.lower() or "rwkv" in model_path.lower() or "opt" in model_path.lower():
         tokenizer.pad_token = tokenizer.eos_token
 
     if training_args.do_lora:
@@ -351,22 +368,16 @@ def train():
             if training_args.gradient_checkpointing:
                 model.get_input_embeddings().requires_grad_(True)
 
-            model.print_trainable_parameters()
+            # model.print_trainable_parameters()
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
+    print("starts training ...")
     trainer.train()
 
-    # while True:
-    #     try:
-    #         trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
-    #         trainer.train()
-    #         break
-    #     except Exception as e:
-    #         print(e)
-    # import ipdb; ipdb.set_trace()
-    # trainer.save_state()
-    # trainer.save_model(output_dir=training_args.output_dir)
+    trainer.save_state()
+    trainer.save_model(output_dir=training_args.output_dir)
+    return trainer
 
 
 if __name__ == "__main__":

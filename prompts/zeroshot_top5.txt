@@ -28,6 +28,8 @@ The format should be as follows
 5. key symptom or condition
 5.1 medical test related to 5
 5.2 medical test related to 5
+
 ### Context: 
 {context}
+
 ### Response:

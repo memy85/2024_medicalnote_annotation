@@ -1,37 +1,25 @@
-### Instruction :
+
+### Instruction:
 You are a helpful assistant, an expert in medical domain. 
-Extract top 5 main diagnosis/symptoms or conditions mentioned in the medical note. 
-Following the diagnosis/symptoms or conditions, identify the medical tests related to it.
-If there isn't any medical tests related to it, just start listing the next important diagnosis/symptoms or conditions.
-If there are no additional diagnosis/symptoms or conditions that you can identify, just list the existing ones and finalize the output. 
-Don't write no symptoms, or any indication that there is no other diagnosis/symptoms or conditions.
+Extract top 5 key terms in the medical note most important for the patient.
+Those terms can be diagnosis, symptoms or conditions.
+If you think they are of same importance, they can have the same ranking.
+Do not write no symptoms, or any indication that there is no other diagnosis/symptoms or conditions.
 Do not modify or abbreviate what is written in the notes. Just extract them as they are.
 Make sure the highest priority is assigned with a smaller number.
 We give you an example, do follow as below.
 The format should be as follows
 
-1. key symptom or condition
-1.1 medical test related to 1
-1.2 medical test related to 1
+1. key term
+1. key term
+2. key term
+3. key term
+3. key term
+4. key term
+5. key term
+5. key term
 
-2. key symptom or condition
-2.1 medical test related to 2
-
-3. key symptom or condition
-3.1 medical test related to 3
-3.2 medical test related to 3
-
-4. key symptom or condition
-4.1 medical test related to 4
-4.2 medical test related to 4
-4.3 medical test related to 4
-
-5. key symptom or condition
-5.1 medical test related to 5
-
-
-### Context : 
-Followup rheumatoid arthritis. 
+### Context : Followup rheumatoid arthritis. 
 1. Rheumatoid arthritis, seropositive. 
 2. Hyperlipidemia. 
 3. Hypothyroidism. 
@@ -75,14 +63,14 @@ cc: name name, MD
 
 ### Response : 
 1. rheumatoid arthritis 
-1.1 methotrexate
-1.2 abnormal bone density study
+1. methotrexate
+1. abnormal bone density study
 2. hyperlipidemia	
-2.1 fish oil
-2.2 lipid panel
+2. fish oil
+2. lipid panel
 3. synovitis
-3.1 niacin
-3.2 statins which caused myalgias
+3. niacin
+3. statins which caused myalgias
 
 
 ### Context : 
@@ -111,13 +99,12 @@ name name is a 58-year-old man referred for evaluation of thrombocytosis. No rec
 ### Response : 
 1. thrombocytosis	
 2. Crohn disease
-2.1 budesonide
+2. budesonide
 3. diabetes mellitus
-3.1 metformin
+3. metformin
 4. Iron deficiency
-4.1 oral iron
+4. oral iron
 5. myeloproliferative neoplasms
-
 
 ### Context : 
 {context}

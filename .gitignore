@@ -1,4 +1,5 @@
 data
+old
 config
 MedJEx
 sharmin_results
@@ -7,6 +8,7 @@ temporal-wiki-links-sample
 logs
 src/MedJEx
 src/__pycache__
+.gitignore
 
 *.pyc
 __pycache__

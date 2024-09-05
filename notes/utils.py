@@ -5,6 +5,7 @@ import os, sys
 import yaml
 
 CURRENT_FILE_PATH = Path(__file__).absolute()
+PROJECT_PATH = CURRENT_FILE_PATH.parents[1]
 PROMPT_PATH = CURRENT_FILE_PATH.parents[1].joinpath('prompts')
 
 class Config :
@@ -15,6 +16,11 @@ class Config :
     @property 
     def project_path(self) :
         return Path(self.file['project_path'])
+    
+    @property
+    def file_path(self) :
+        return PROJECT_PATH
+
 
     def model_path(self, model_name) :
         return self.file['model_path'][model_name]
@@ -55,3 +61,37 @@ def load_config() :
     return Config(config)
 
 
+def format_prompt(fileids, topN) : 
+    '''
+    format prompts for the examples that are used for finetuning
+    '''
+
+    with open(PROJECT_PATH.joinpath("data/processed/cv_processed_ranking_datasets.pkl"), 'rb') as f :
+        _, top10_dataset, notes = pickle.load(f)
+    # get the EHR note
+
+    with open(PROMPT_PATH.joinpath("finetune_instruction.txt"), 'r') as f :
+        instruction = f.read()
+    instruction = instruction.format(topN=topN)
+
+    parsed_dataset = []
+    for fileid in fileids : 
+        ehr_note = notes[notes.noteid == fileid]
+        input_text = ehr_note.values[0][2]
+
+        # format the outputs 
+        df = top10_dataset[(top10_dataset.fileid == fileid) & (top10_dataset.ranking < (topN+1))].copy()
+        output_text = ""
+
+        for idx, row in df.iterrows() :
+            output_text += str(row.ranking) + " " + row.phrase + "\n" 
+
+        output = {"input" : input_text,
+                  "output" : output_text,
+                  "instruction" : instruction
+                  }
+
+        parsed_dataset.append(output)
+
+    return parsed_dataset
+    

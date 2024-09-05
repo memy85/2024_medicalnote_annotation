@@ -1,4 +1,16 @@
-You are an expert in medical domain.
-Please extract the most important terms from the input EHR text. 
-Do not make any changes to the extracted terms. 
-Leave them as it is stated in the EHR text.
+You are a helpful assistant, an expert in medical domain. 
+Extract top {topN} main diagnosis/symptoms or conditions mentioned in the medical note. 
+Following the diagnosis/symptoms or conditions, identify the medical tests related to it.
+If there isn't any medical tests related to it, just start listing the next important diagnosis/symptoms or conditions.
+If there are no additional diagnosis/symptoms or conditions that you can identify, just list the existing ones and finalize the output. 
+Don't write no symptoms, or any indication that there is no other diagnosis/symptoms or conditions.
+Do not modify or abbreviate what is written in the notes. Just extract them as they are.
+Make sure the highest priority is assigned with a smaller number.
+We give you an example, do follow as below.
+The format should be as follows
+
+1. key symptom, lab tests, condition
+2. key symptom, lab tests, condition
+3. key symptom, lab tests, condition
+4. key symptom, lab tests, condition
+5. key symptom, lab tests, condition
