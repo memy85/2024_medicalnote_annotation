@@ -141,17 +141,17 @@ def get_results(gold_dataset, pred_dataset, testset_ids, rank) :
         recalls.append(recall)
         mrrs.append(mrr)
     
-    p = round(np.array(precisions).mean(),3)
-    r = round(np.array(recalls).mean(), 3)
-    f1 = round(2*p*r/(p+r),3)
-    m = round(np.array(mrrs).mean(),3)
+    p_avg = round(np.array(precisions).mean(),3)
+    r_avg = round(np.array(recalls).mean(), 3)
+    f1_avg = round(2*p_avg*r_avg/(p_avg+r_avg),3)
+    m_avg = round(np.array(mrrs).mean(),3)
 
-    print("The precision is %.3f" %p)
-    print("The recall is %.3f" %r)
-    print("The F1 score is %.3f" %f1)
-    print("The mrr is %.3f" %m)
+    print("The F1 score is %.3f" %f1_avg)
+    print("The precision is %.3f" %p_avg)
+    print("The recall is %.3f" %r_avg)
+    print("The mrr is %.3f" %m_avg)
 
-    return p, r, f1, m # precisions, recalls, mrrs
+    return p_avg, r_avg, f1_avg, m_avg # precisions, recalls, mrrs
 
 def parse_arguments() :
     parser = argparse.ArgumentParser()

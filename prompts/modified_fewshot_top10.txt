@@ -7,7 +7,6 @@ Do not write no symptoms, or any indication that there is no other diagnosis/sym
 Do not modify or abbreviate what is written in the notes. Just extract them as they are.
 Make sure the highest priority is assigned with a smaller number.
 We give you an example, do follow as below.
-The format should be as follows
 
 1. key term
 1. key term

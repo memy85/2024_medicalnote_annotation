@@ -68,6 +68,7 @@ def parse_arguments() :
     parser.add_argument("--max_new_token", type=int, help='max token', default=100)
     parser.add_argument("--quantization", type=str, help="choose either 8 or None", default=None)
     parser.add_argument("--just_evaluation", type=str2bool, nargs='?', const=True, default=False, help="whether to do just evaluation")
+    parser.add_argument("--prompt_name", type=str, help="name of prompt", default="")
     
     args = parser.parse_args()
     return args
@@ -84,6 +85,8 @@ if __name__ == "__main__" :
     max_new_token = args.max_new_token
     quantization = args.quantization
     just_eval_flag = args.just_evaluation
+    save_name = args.save_name
+    prompt_name = args.prompt_name
     rank = int(topn.replace("top", ""))
     print("finetune flag : ", do_finetune, file=sys.stderr)
 
@@ -92,19 +95,19 @@ if __name__ == "__main__" :
     else :
         quantization_flag = True
 
-    MODEL_PATH = config.model_path(model_name)
+    # MODEL_PATH = config.model_path(model_name)
 
     # ** if we are already testing a finetuning model
-    if "finetuned" in MODEL_PATH :
-        fflag = True
-    else : 
-        fflag = False
+    # if "finetuned" in MODEL_PATH :
+    #     fflag = True
+    # else : 
+    #     fflag = False
 
     # ** whether to do finetuning from scratch 
     if do_finetune : 
         file_name = f"{model_name}_finetuned"
 
-    print("The MODEL_PATH is ", MODEL_PATH, file=sys.stderr)
+    # print("The MODEL_PATH is ", MODEL_PATH, file=sys.stderr)
 
     #%%
     # ** explanation
@@ -119,7 +122,7 @@ if __name__ == "__main__" :
     # =============================================== starting CV ==================================================== #
     # ================================================================================================================ #
     
-    template = config.template(topn=topn, inference=inference)
+    template = config.template(topn=topn, inference=inference, prompt_name=prompt_name)
     dataset = Dataset.from_pandas(filtered_notes)
 
     results = []
@@ -147,6 +150,7 @@ if __name__ == "__main__" :
                 # ** Name of the finetuned model
                 print("doing finetuning & not just evaluation", file=sys.stderr)
                 finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
+                MODEL_PATH = config.model_path(model_name=model_name)
                 
                 arguments = f'''
                 --model_name_or_path {model_name}
@@ -180,14 +184,19 @@ if __name__ == "__main__" :
             elif just_eval_flag :
                 print("already finetuned models & doing just evaluation", file=sys.stderr)
                 finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
+                checkpoint = config.checkpoint # get the checkppoint number
+                MODEL_PATH = PROJECT_PATH.joinpath(f"models/{finetune_model_name}/checkpoint-{checkpoint}").as_posix()
+
                 model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, device_map='auto')
                 # checkpoint_path = PROJECT_PATH.joinpath(f"models/{finetune_model_name}/checkpoint-100")
                 model = PeftModel.from_pretrained(model, MODEL_PATH)
                 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
 
         else :
-            print("vanilla model & doing not just evaluation", file=sys.stderr)
+            print("vanilla model!", file=sys.stderr)
             vanilla_model_name = f"{model_name}_{dataset_name}"
+            MODEL_PATH = config.model_path(model_name)
+
             model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, device_map='auto')
             tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
             tokenizer.add_special_tokens({
@@ -231,55 +240,33 @@ if __name__ == "__main__" :
 
         #%% 
         gold_dataset = top10_dataset[~top10_dataset.fileid.isin(trainset)].copy()
-        
-        # erase this below
-        # import re
-        # from evaluate_model import preprocess_outputs_of_mistral,calculate_mrr
-        # file_name = "mistral7b"
-        # with open(DATA_PATH.joinpath(f"{file_name}_{dataset_name}.pkl"), 'rb') as f :
-        #     outputs = pickle.load(f)
-        # pred_dataset = outputs
-        # len(pred_dataset)
-
-        #%%
 
         gold_dataset = gold_dataset[gold_dataset.ranking < rank + 1].copy()
         pred_dataset = outputs
 
         testset_notes = filtered_notes[~filtered_notes.noteid.isin(trainset)].copy()
 
-        #%% erase below
-        # testset['noteid'] # this is the one generates the outputs
-
-        #%% erase below
-        # p = re.compile('^\d+')
-        # noteid = 'liver_failure.report37286.txt'
-        # gold = gold_dataset[gold_dataset.fileid == noteid][['ranking', 'phrase']].copy()
-        # gold['ranking'] = gold['ranking'].apply(lambda x : int(p.findall(str(x))[0]))
-        # gold = [tuple(x) for x in gold.to_numpy()]
-        # pred = preprocess_outputs_of_mistral(outputs[0], rank)
-
-        #%% erase 5
-        p, r, f1, m = em.get_results(gold_dataset, pred_dataset, testset['noteid'], rank) 
+        #%% calculate results
+        p_avg, r_avg, f1_avg, m_avg = em.get_results(gold_dataset, pred_dataset, testset['noteid'], rank) 
 
         #%%
 
         if do_finetune : 
-            record = {"model" : model_name + "_finetuned", "cv" : idx, "topN" : rank, "shots" : inference, "precision" : p, "recall" : r, "f1" : f1, "mrr" : m}
+            record = {"model" : model_name + "_finetuned", "cv" : idx, "topN" : rank, "shots" : inference, "precision" : p_avg, "recall" : r_avg, "f1" : f1_avg, "mrr" : m_avg}
             results.append(record)
 
         else :
-            record = {"model" : model_name, "cv" : idx, "topN" : rank, "shots" : inference, "precision" : p, "recall" : r, "f1" : f1, "mrr" : m}
+            record = {"model" : model_name, "cv" : idx, "topN" : rank, "shots" : inference, "precision" : p_avg, "recall" : r_avg, "f1" : f1_avg, "mrr" : m_avg}
             results.append(record)
 
         # ** delete the models in the memory
-        if do_finetune :
+        if do_finetune & (not just_eval_flag) :
             del trainer
         del model, tokenizer
         gc.collect()
         torch.cuda.empty_cache()
     
-    with open(DATA_PATH.joinpath(f"{topn}_{file_name}_{inference}_evaluation.pkl"), 'wb') as f :
+    with open(DATA_PATH.joinpath(f"{topn}_{save_name}_{inference}_evaluation.pkl"), 'wb') as f :
         pickle.dump(results, f)
     
     print(f"{dataset_name} finished!", file=sys.stderr)

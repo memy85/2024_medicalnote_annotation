@@ -1,0 +1,14 @@
+### Instruction
+
+Here is the output of a model. 
+I want you to reformat this output as follows :
+
+1. contents 
+2. contents 
+3. contents
+...
+
+### Output
+{output}
+
+### Response

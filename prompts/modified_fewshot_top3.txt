@@ -1,7 +1,7 @@
 
 ### Instruction:
 You are a helpful assistant, an expert in medical domain. 
-Extract top 5 key terms in the medical note most important for the patient.
+Extract top 3 key terms in the medical note most important for the patient.
 Those terms can be diagnosis, symptoms or conditions.
 If you think they are of same importance, they can have the same ranking.
 Do not write no symptoms, or any indication that there is no other diagnosis/symptoms or conditions.
@@ -14,9 +14,6 @@ We give you an example, do follow as below.
 2. key term
 3. key term
 3. key term
-4. key term
-5. key term
-5. key term
 
 ### Context : Followup rheumatoid arthritis. 
 1. Rheumatoid arthritis, seropositive. 
@@ -101,9 +98,6 @@ name name is a 58-year-old man referred for evaluation of thrombocytosis. No rec
 2. budesonide
 3. diabetes mellitus
 3. metformin
-4. Iron deficiency
-4. oral iron
-5. myeloproliferative neoplasms
 
 ### Context : 
 {context}

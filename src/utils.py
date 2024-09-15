@@ -20,8 +20,14 @@ class Config :
     def model_path(self, model_name) :
         return self.file['model_path'][model_name]
     
-    def template(self, inference, topn) :
-        template_path = PROMPT_PATH.joinpath(f'{inference}_{topn}.txt')
+    def template(self,inference, topn, **kwargs) :
+        name = kwargs.get("prompt_name")
+
+        if name == "" :
+            template_path = PROMPT_PATH.joinpath(f'{inference}_{topn}.txt')
+        else :
+            template_path = PROMPT_PATH.joinpath(f'{name}_{inference}_{topn}.txt')
+
         with open(template_path, 'r') as f :
             template = f.read()
         return template
@@ -44,6 +50,17 @@ class Config :
     @property 
     def device(self) :
         return self.file['device']
+
+    @property 
+    def checkpoint(self) :
+        return self.file['checkpoint']
+
+    @property 
+    def restructuring_format(self) :
+        path = PROMPT_PATH.joinpath("restructuring_instruction.txt")
+        with open(path, 'r') as f :
+            prompt = f.read()
+        return prompt
 
 
 def load_config() :

@@ -8,7 +8,8 @@ temporal-wiki-links-sample
 logs
 src/MedJEx
 src/__pycache__
+outputs
 .gitignore
 
 *.pyc
-__pycache__
+*__pycache__
