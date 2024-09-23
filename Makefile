@@ -96,6 +96,67 @@ finetune_biomistral_avigon_on_jinying :
 	  > logs/finetune_biomistral7b_avigon_on_jinying.log
 
 
+finetune_mistral_on_mimic : 
+	python3 src/finetune_models.py \
+	  --model_name_or_path mistral7b \
+	  --data_path data/processed/discharge_dataset.json \
+	  --bf16 False \
+	  --use_fast_tokenizer False \
+	  --output_dir ./models/mistral7b_mimic \
+	  --log_level debug \
+	  --logging_dir ./logs/models/mistral7b_mimic/logs \
+	  --num_train_epochs 100 \
+	  --per_device_train_batch_size 1 \
+	  --gradient_accumulation_steps 128 \
+	  --model_max_length 20000 \
+	  --evaluation_strategy "no" \
+	  --save_strategy "steps" \
+	  --save_steps 10 \
+	  --logging_steps 1 \
+	  --save_total_limit 100 \
+	  --learning_rate 3e-4 \
+	  --weight_decay 0.0 \
+	  --warmup_steps 200 \
+	  --do_lora True \
+	  --lora_r 64 \
+	  --lora_target_modules "q_proj,v_proj,k_proj,o_proj" \
+	  --gradient_checkpointing True \
+	  --load_in_8bit False \
+	  --report_to tensorboard \
+	  > logs/finetune_mistral7b_on_mimic.log
+
+finetune_biomistral_avigon_on_mimic : 
+	python3 src/finetune_models.py \
+	  --model_name_or_path biomistral7b_avigon \
+	  --data_path data/processed/discharge_dataset.json \
+	  --bf16 False \
+	  --use_fast_tokenizer False \
+	  --output_dir ./models/biomistral7b_avigon_mimic \
+	  --log_level debug \
+	  --logging_dir ./logs/models/biomistral7b_avigon_mimic/logs \
+	  --num_train_epochs 100 \
+	  --per_device_train_batch_size 1 \
+	  --gradient_accumulation_steps 128 \
+	  --model_max_length 20000 \
+	  --evaluation_strategy "no" \
+	  --save_strategy "steps" \
+	  --save_steps 10 \
+	  --logging_steps 1 \
+	  --save_total_limit 100 \
+	  --learning_rate 3e-4 \
+	  --weight_decay 0.0 \
+	  --warmup_steps 200 \
+	  --do_lora True \
+	  --lora_r 64 \
+	  --lora_target_modules "q_proj,v_proj,k_proj,o_proj" \
+	  --gradient_checkpointing True \
+	  --load_in_8bit False \
+	  --report_to tensorboard \
+	  > logs/finetune_biomistral7b_avigon_on_mimic.log
+
+#################### ----------------------------------------------- ####################
+#################### --------------------------------------------------- Cross-Validation
+
 cv_no_finetune :
 	python3 src/cross_validation.py --model mistral7b --finetune False --inference zeroshot --topn top3 --save_name mistral7b --max_new_token 200 > ./logs/mistral7b_top3_zeroshot.log 2>&1
 	python3 src/cross_validation.py --model mistral7b --finetune False --inference fewshot --topn top3 --save_name mistral7b --max_new_token 200 > ./logs/mistral7b_top3_fewshot.log 2>&1
@@ -182,14 +243,14 @@ cv_mistral_mimic_finetune :
 	python3 src/cross_validation.py --model mistral7b_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top10 --save_name mistral7b_mimic --max_new_token 400 > ./logs/mistral7b_mimic_top10_fewshot.log 2>&1
 
 cv_biomistral_mimic_finetune :
-	python3 src/cross_validation.py --model biomistral7b_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top3 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top3 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top3_fewshot.log 2>&1
+	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top3 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top3_zeroshot.log 2>&1
+	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top3 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top3_fewshot.log 2>&1
 
-	python3 src/cross_validation.py --model biomistral7b_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top5 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top5 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top5_fewshot.log 2>&1
+	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top5 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top5_zeroshot.log 2>&1
+	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top5 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top5_fewshot.log 2>&1
 
-	python3 src/cross_validation.py --model biomistral7b_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top10 --save_name biomistral7b_mimic --max_new_token 400 > ./logs/biomistral7b_mimic_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top10 --save_name biomistral7b_mimic --max_new_token 400 > ./logs/biomistral7b_mimic_top10_fewshot.log 2>&1
+	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top10 --save_name biomistral7b_mimic --max_new_token 400 > ./logs/biomistral7b_mimic_top10_zeroshot.log 2>&1
+	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top10 --save_name biomistral7b_mimic --max_new_token 400 > ./logs/biomistral7b_mimic_top10_fewshot.log 2>&1
 
 
 modified_cv_no_finetune :

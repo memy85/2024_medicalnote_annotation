@@ -61,6 +61,13 @@ class Config :
         with open(path, 'r') as f :
             prompt = f.read()
         return prompt
+    
+    @property
+    def chatgpt_prompt(self) :
+        path = PROMPT_PATH.joinpath("chatgpt_prompt.txt")
+        with open(path, 'r') as f :
+            prompt = f.read()
+        return prompt
 
 
 def load_config() :
