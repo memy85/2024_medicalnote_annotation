@@ -320,13 +320,14 @@ def train(args = None):
         load_in_8bit=training_args.load_in_8bit,
     )
 
-    # if "llama" in model_args.model_name_or_path.lower() or "alpaca" in model_args.model_name_or_path.lower() or "vicuna" in model_args.model_name_or_path.lower():
-    #     tokenizer.add_special_tokens({
-    #         "eos_token": DEFAULT_EOS_TOKEN,
-    #         "bos_token": DEFAULT_BOS_TOKEN,
-    #         "unk_token": DEFAULT_UNK_TOKEN,
-    #     })
-    #     tokenizer.pad_token = tokenizer.eos_token
+    if "llama" in model_args.model_name_or_path.lower() or "alpaca" in model_args.model_name_or_path.lower() or "vicuna" in model_args.model_name_or_path.lower():
+        # tokenizer.add_special_tokens({
+        #      "eos_token": DEFAULT_EOS_TOKEN,
+        #      "bos_token": DEFAULT_BOS_TOKEN,
+        #      "unk_token": DEFAULT_UNK_TOKEN
+        #      })
+        tokenizer.pad_token = tokenizer.eos_token
+        print("added tokens to llama tokenizer")
 
     # if "mistral" in  model_args.model_name_or_path.lower() or "pythia" in model_args.model_name_or_path.lower() or "rwkv" in model_args.model_name_or_path.lower() or "opt" in model_args.model_name_or_path.lower():
 

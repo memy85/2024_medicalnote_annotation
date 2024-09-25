@@ -1,6 +1,7 @@
 
 CUDA_DEVICE_ORDER := PCI_BUS_ID
-CUDA_VISIBLE_DEVICES := 0,1
+CUDA_LAUNCH_BLOCKING := 1
+CUDA_VISIBLE_DEVICES := 0,1,2,3
 TORCH_EXTENSIONS_DIR :=/home/zhichaoyang/.cache/torch_extensions
 
 export CUDA_DEVICE_ORDER
@@ -153,6 +154,35 @@ finetune_biomistral_avigon_on_mimic :
 	  --load_in_8bit False \
 	  --report_to tensorboard \
 	  > logs/finetune_biomistral7b_avigon_on_mimic.log
+
+finetune_llama31_on_mimic : 
+	python3 src/finetune_models.py \
+	  --model_name_or_path llama31 \
+	  --data_path data/processed/discharge_dataset.json \
+	  --bf16 False \
+	  --use_fast_tokenizer False \
+	  --output_dir ./models/llama31_mimic \
+	  --log_level debug \
+	  --logging_dir ./logs/models/llama31_mimic/logs \
+	  --num_train_epochs 100 \
+	  --per_device_train_batch_size 1 \
+	  --gradient_accumulation_steps 128 \
+	  --model_max_length 20000 \
+	  --evaluation_strategy "no" \
+	  --save_strategy "steps" \
+	  --save_steps 10 \
+	  --logging_steps 1 \
+	  --save_total_limit 100 \
+	  --learning_rate 3e-4 \
+	  --weight_decay 0.0 \
+	  --warmup_steps 200 \
+	  --do_lora True \
+	  --lora_r 64 \
+	  --lora_target_modules "q_proj,v_proj,k_proj,o_proj" \
+	  --gradient_checkpointing True \
+	  --load_in_8bit False \
+	  --report_to tensorboard \
+	  > logs/finetune_llama31_on_mimic.log 2>&1
 
 #################### ----------------------------------------------- ####################
 #################### --------------------------------------------------- Cross-Validation
