@@ -79,7 +79,14 @@ def calculate_precision_recall(gold, pred) :
     if gold_cnt == 0 :
         gold_cnt = 0.001
 
-    recall_score = cnt / gold_cnt
+    # recall == sensitivity
+    # RECALL == TP / (TP + FN)
+    # TP == cnt, TP + FN == gold_cnt
+    recall_score = cnt / gold_cnt 
+
+    # FPR == FP / (FP + TN)
+    # FP == wrong_cnt, FP + TN == wrong_cnt + 
+    # But here, we don't have TN
 
     if recall_score > 1.0 :
         recall_score = 1.0

@@ -68,7 +68,7 @@ def parse_arguments() :
     parser.add_argument("--max_new_token", type=int, help='max token', default=100)
     parser.add_argument("--quantization", type=str, help="choose either 8 or None", default=None)
     parser.add_argument("--just_evaluation", type=str2bool, nargs='?', const=True, default=False, help="whether to do just evaluation")
-    parser.add_argument("--prompt_name", type=str, help="name of prompt", default="")
+    parser.add_argument("--prompt_name", type=str, help="name of prompt", default=None)
     
     args = parser.parse_args()
     return args
@@ -132,7 +132,6 @@ if __name__ == "__main__" :
     # trainset : each files that belongs to the testset
     #%%
     for idx, trainset in enumerate(cv5) : 
-
         print(f"starting cv ------------------ {idx} ----------------", file=sys.stderr)
         # filter_dataset : the test set
         testset = dataset.filter(lambda x : x["noteid"] not in trainset)
@@ -146,10 +145,29 @@ if __name__ == "__main__" :
         dataset_name = f"cv{idx}_rank{rank}"
         #%%
         if do_finetune :
-            if not just_eval_flag : 
+
+            if just_eval_flag : 
+                print("already finetuned models & doing just evaluation", file=sys.stderr)
+                if prompt_name is not None :
+                    finetune_model_name = f"{model_name}_finetuned_{prompt_name}_{dataset_name}"
+                else :
+                    finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
+
+                checkpoint = config.checkpoint # get the checkppoint number
+                MODEL_PATH = PROJECT_PATH.joinpath(f"models/{finetune_model_name}/checkpoint-{checkpoint}").as_posix()
+
+                model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, device_map='auto')
+                # checkpoint_path = PROJECT_PATH.joinpath(f"models/{finetune_model_name}/checkpoint-100")
+                model = PeftModel.from_pretrained(model, MODEL_PATH)
+                tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+
+            else :
                 # ** Name of the finetuned model
                 print("doing finetuning & not just evaluation", file=sys.stderr)
-                finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
+                if prompt_name is not None :
+                    finetune_model_name = f"{model_name}_finetuned_{prompt_name}_{dataset_name}"
+                else :
+                    finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
                 MODEL_PATH = config.model_path(model_name=model_name)
                 
                 arguments = f'''
@@ -180,17 +198,6 @@ if __name__ == "__main__" :
                 trainer = finetune_models.train(arguments)
                 model = trainer.model
                 tokenizer = trainer.tokenizer
-
-            elif just_eval_flag :
-                print("already finetuned models & doing just evaluation", file=sys.stderr)
-                finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
-                checkpoint = config.checkpoint # get the checkppoint number
-                MODEL_PATH = PROJECT_PATH.joinpath(f"models/{finetune_model_name}/checkpoint-{checkpoint}").as_posix()
-
-                model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, device_map='auto')
-                # checkpoint_path = PROJECT_PATH.joinpath(f"models/{finetune_model_name}/checkpoint-100")
-                model = PeftModel.from_pretrained(model, MODEL_PATH)
-                tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
 
         else :
             print("vanilla model!", file=sys.stderr)
@@ -230,7 +237,7 @@ if __name__ == "__main__" :
             torch.cuda.empty_cache()
 
 
-        with open(DATA_PATH.joinpath(f"{file_name}_{dataset_name}.pkl"), 'wb') as f :
+        with open(DATA_PATH.joinpath(f"{finetune_model_name}.pkl"), 'wb') as f :
             pickle.dump(outputs,f)
 
 

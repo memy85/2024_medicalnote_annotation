@@ -2,11 +2,15 @@
 import pickle
 from pathlib import Path
 import os, sys
+import requests
+import argparse
 import yaml
 
 CURRENT_FILE_PATH = Path(__file__).absolute()
 PROJECT_PATH = CURRENT_FILE_PATH.parents[1]
 PROMPT_PATH = CURRENT_FILE_PATH.parents[1].joinpath('prompts')
+LINE_ACCESS_TOKEN = os.getenv("LINE_ACCESS_TOKEN")
+LINE_USER_ID = os.getenv("LINE_USER_ID")
 
 class Config :
 
@@ -21,12 +25,12 @@ class Config :
         return self.file['model_path'][model_name]
     
     def template(self,inference, topn, **kwargs) :
-        name = kwargs.get("prompt_name")
 
-        if name == "" :
-            template_path = PROMPT_PATH.joinpath(f'{inference}_{topn}.txt')
-        else :
+        name = kwargs.get("prompt_name")
+        if name is not None :
             template_path = PROMPT_PATH.joinpath(f'{name}_{inference}_{topn}.txt')
+        else :
+            template_path = PROMPT_PATH.joinpath(f'{inference}_{topn}.txt')
 
         with open(template_path, 'r') as f :
             template = f.read()
@@ -113,4 +117,33 @@ def format_prompt(fileids, topN) :
         parsed_dataset.append(output)
 
     return parsed_dataset
-    
+
+def send_line_message(message):
+    # LINE Messaging API endpoint
+    url = 'https://api.line.me/v2/bot/message/push'
+
+    # Request headers
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {LINE_ACCESS_TOKEN}'
+    }
+
+    # Request body
+    data = {
+        'to': LINE_USER_ID,
+        'messages': [
+            {
+                'type': 'text',
+                'text': message
+            }
+        ]
+    }
+    # Send the POST request
+    response = requests.post(url, headers=headers, json=data)
+
+    # Check the response
+    if response.status_code == 200:
+        print('Message sent successfully')
+    else:
+        print(f'Failed to send message. Status code: {response.status_code}, Response: {response.text}')
+

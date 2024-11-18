@@ -7,7 +7,7 @@ from utils import *
 import random
 from datasets import Dataset
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
-from peft.peft_model import PeftModel
+from peft.peft_model import PeftModel, PeftModelForCausalLM
 import evaluate_model as em
 
 
@@ -30,10 +30,12 @@ cv5, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_proce
 wholedataset = set(top10_dataset.fileid.unique().tolist())
 trainset = set(cv5[0])
 testset = list(wholedataset - trainset)
+testset = sorted(testset)
 
 # set random samples
-random.seed(1)
-sample_files = random.sample(testset, 3)
+random.seed(42)
+sample_files = random.sample(testset, 10)
+# print(f"testset is : {testset}", file=sys.stderr)
 print("The chosen files are : ", file=sys.stderr)
 print(sample_files, file=sys.stderr)
 
@@ -103,6 +105,7 @@ def parse_arguments() :
     parser.add_argument("--topn", type=str, help='choose between default top3, top5, top10', default='top3')
     parser.add_argument("--max_new_token", type=int, help='max token', default=100)
     parser.add_argument("--quantization", type=str, help="choose either 8 or None", default=None)
+    parser.add_argument("--prompt_name", type=str, default=None)
     
     args = parser.parse_args()
     return args
@@ -110,12 +113,12 @@ def parse_arguments() :
 def main() :
 
     args = parse_arguments()
-    MODEL_PATH = config.model_path(args.model)
     finetune_flag = args.finetune
     inference = args.inference
     topn = args.topn
     max_new_token = args.max_new_token
     rank = int(topn.replace("top", ""))
+    prompt_name = args.prompt_name
     
     # set file name if finetuned
     if finetune_flag :
@@ -126,18 +129,32 @@ def main() :
 
     # process dataset with questions
     dataset = Dataset.from_pandas(filtered_notes)
-    template = config.template(topn=topn, inference=inference)
-    restructuring_template = config.restructuring_format
+    template = config.template(inference=inference, topn=topn, prompt_name=prompt_name)
+    # restructuring_template = config.restructuring_format
     dataset = dataset.map(process_texts, batched=True, fn_kwargs ={"template" : template})
     dataset = dataset.to_pandas()
 
     # load model
     if finetune_flag :
-        model_name = args.model + "_finetuned"
-        MODEL_PATH = config.model_path(model_name)
-        model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, device_map="auto")
-        model = PeftModel.from_pretrained(model, MODEL_PATH)
+        if "mimic" in args.model :
+            model_name = args.model + "_finetuned"
+            original_model_name = args.model.replace("_mimic","")
+            MODEL_PATH = config.model_path(model_name)
+
+            model = AutoModelForCausalLM.from_pretrained(config.model_path(original_model_name), device_map="auto")
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+            model.resize_token_embeddings(len(tokenizer))
+            model = PeftModel.from_pretrained(model, MODEL_PATH)
+        else :
+            model_name = args.model + "_finetuned"
+            MODEL_PATH = config.model_path(model_name)
+            model = AutoModelForCausalLM.from_pretrained(config.model_path(args.model), device_map="auto")
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+            model.resize_token_embeddings(len(tokenizer))
+            model = PeftModel.from_pretrained(model, MODEL_PATH)
     else :
+        model_name = args.model
+        MODEL_PATH = config.model_path(args.model)
         model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, device_map="auto")
         tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
 
@@ -147,6 +164,10 @@ def main() :
                 "unk_token": DEFAULT_UNK_TOKEN,
             })
     tokenizer.pad_token = tokenizer.eos_token
+    print(file=sys.stderr)
+    print(f"model name is {model_name}", file=sys.stderr)
+    print(file=sys.stderr)
+
 
     output_texts = ""
     for idx, sample_file in enumerate(sample_files) :

@@ -8,6 +8,8 @@ temporal-wiki-links-sample
 logs
 src/MedJEx
 src/__pycache__
+src/wandb
+src/results
 outputs
 .gitignore
 
