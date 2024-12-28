@@ -1,11 +1,12 @@
 
 #%%
-import os
+import os, sys
 import pickle
 import gc
 # os.environ['CUDA_DEVICE_ORDER'] = "PCI_BUS_ID"
 # os.environ['CUDA_VISIBLE_DEVICES'] = "1,2,3"
 
+import torch
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from peft.peft_model import PeftModel
 
@@ -60,14 +61,15 @@ def str2bool(v):
 
 def parse_arguments() :
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, help="choose model")
+    parser.add_argument("--model", type=str, help="choose model, this will also be used as a file_name.")
     parser.add_argument("--finetune", type=str2bool, nargs='?', const=True, default=False)
     parser.add_argument("--inference", type=str, help='choose between zeroshot, fewshot', default='zeroshot')
     parser.add_argument("--topn", type=str, help='choose between default top3, top5, top10', default='top3')
     parser.add_argument("--save_name", type=str, help='name of the file', default='test')
-    parser.add_argument("--max_new_token", type=int, help='max token', default=100)
+    parser.add_argument("--max_new_token", type=int, help='max token', default=200)
     parser.add_argument("--quantization", type=str, help="choose either 8 or None", default=None)
     parser.add_argument("--just_evaluation", type=str2bool, nargs='?', const=True, default=False, help="whether to do just evaluation")
+    parser.add_argument("--baseline", type=str2bool, nargs='?', const=True, default=False, help="whether this is a baseline model or not")
     parser.add_argument("--prompt_name", type=str, help="name of prompt", default=None)
     
     args = parser.parse_args()
@@ -78,7 +80,6 @@ if __name__ == "__main__" :
 
     args = parse_arguments()
     model_name = args.model
-    file_name = args.model # the save name and the model name are going to be the same initially
     inference = args.inference
     do_finetune = args.finetune
     topn = args.topn
@@ -87,25 +88,28 @@ if __name__ == "__main__" :
     just_eval_flag = args.just_evaluation
     save_name = args.save_name
     prompt_name = args.prompt_name
+    baseline_flag = args.baseline
     rank = int(topn.replace("top", ""))
     print("finetune flag : ", do_finetune, file=sys.stderr)
+    print("torch visible devices : ", torch.cuda.device_count(), file=sys.stderr)
 
     if quantization is None : 
         quantization_flag = False
     else :
         quantization_flag = True
 
-    # MODEL_PATH = config.model_path(model_name)
-
-    # ** if we are already testing a finetuning model
-    # if "finetuned" in MODEL_PATH :
-    #     fflag = True
-    # else : 
-    #     fflag = False
-
     # ** whether to do finetuning from scratch 
-    if do_finetune : 
-        file_name = f"{model_name}_finetuned"
+    if prompt_name == "modified" :
+        if do_finetune : 
+            real_name = f"{model_name}_finetuned_{prompt_name}"
+        else :
+            real_name = f"{model_name}_{prompt_name}"
+    else :
+        if do_finetune : 
+            real_name = f"{model_name}_finetuned"
+        else :
+            real_name = model_name
+
 
     # print("The MODEL_PATH is ", MODEL_PATH, file=sys.stderr)
 
@@ -114,7 +118,8 @@ if __name__ == "__main__" :
     # cv5 : the cross validation training set list 
     # top10 dataset : medical key word dataset
     # filtered_notes : the EHR notes 
-    cv5, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_processed_ranking_datasets.pkl"))
+    # cv5, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_processed_ranking_datasets.pkl"))
+    cv5, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_processed_ranking_datasets_new.pkl"))
 
     #%%
 
@@ -142,29 +147,30 @@ if __name__ == "__main__" :
 
         # ** do finetuning if we have finetune flag
         # these are the train set (21 files)
-        dataset_name = f"cv{idx}_rank{rank}"
+        # dataset_name = f"cv{idx}_rank{rank}"
+        dataset_name = f"cv{idx}"
         #%%
         if do_finetune :
 
             if just_eval_flag : 
                 print("already finetuned models & doing just evaluation", file=sys.stderr)
-                if prompt_name is not None :
-                    finetune_model_name = f"{model_name}_finetuned_{prompt_name}_{dataset_name}"
-                else :
-                    finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
+                # if prompt_name == "modified" :
+                #     finetune_model_name = f"{model_name}_finetuned_{prompt_name}_{dataset_name}"
+                # else :
+                #     finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
+                finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
 
                 checkpoint = config.checkpoint # get the checkppoint number
                 MODEL_PATH = PROJECT_PATH.joinpath(f"models/{finetune_model_name}/checkpoint-{checkpoint}").as_posix()
 
                 model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, device_map='auto')
-                # checkpoint_path = PROJECT_PATH.joinpath(f"models/{finetune_model_name}/checkpoint-100")
                 model = PeftModel.from_pretrained(model, MODEL_PATH)
                 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
 
             else :
                 # ** Name of the finetuned model
                 print("doing finetuning & not just evaluation", file=sys.stderr)
-                if prompt_name is not None :
+                if prompt_name == "modified" :
                     finetune_model_name = f"{model_name}_finetuned_{prompt_name}_{dataset_name}"
                 else :
                     finetune_model_name = f"{model_name}_finetuned_{dataset_name}"
@@ -254,16 +260,15 @@ if __name__ == "__main__" :
         testset_notes = filtered_notes[~filtered_notes.noteid.isin(trainset)].copy()
 
         #%% calculate results
-        p_avg, r_avg, f1_avg, m_avg = em.get_results(gold_dataset, pred_dataset, testset['noteid'], rank) 
+        p_avg, r_avg, f1_avg, m_avg, map_avg = em.get_results(gold_dataset, pred_dataset, testset['noteid'], rank) 
 
         #%%
-
         if do_finetune : 
-            record = {"model" : model_name + "_finetuned", "cv" : idx, "topN" : rank, "shots" : inference, "precision" : p_avg, "recall" : r_avg, "f1" : f1_avg, "mrr" : m_avg}
+            record = {"model" : real_name, "cv" : idx, "topN" : rank, "shots" : inference, "precision" : p_avg, "recall" : r_avg, "f1" : f1_avg, "mrr" : m_avg, "map" : map_avg}
             results.append(record)
 
         else :
-            record = {"model" : model_name, "cv" : idx, "topN" : rank, "shots" : inference, "precision" : p_avg, "recall" : r_avg, "f1" : f1_avg, "mrr" : m_avg}
+            record = {"model" : real_name, "cv" : idx, "topN" : rank, "shots" : inference, "precision" : p_avg, "recall" : r_avg, "f1" : f1_avg, "mrr" : m_avg, "map" : map_avg}
             results.append(record)
 
         # ** delete the models in the memory
@@ -272,9 +277,16 @@ if __name__ == "__main__" :
         del model, tokenizer
         gc.collect()
         torch.cuda.empty_cache()
-    
-    with open(DATA_PATH.joinpath(f"{topn}_{save_name}_{inference}_evaluation.pkl"), 'wb') as f :
+
+    # --------------------- End of Cross Validation, Now Save the results 
+    evaluation_df = em.calculate_the_scores_with_confidence_intervals(results, baseline_flag) 
+
+    evaluation_df.to_pickle(DATA_PATH.joinpath(f"{topn}_{real_name}_{inference}_df.pkl"))
+
+    with open(DATA_PATH.joinpath(f"{topn}_{real_name}_{inference}_evaluation.pkl"), 'wb') as f :
         pickle.dump(results, f)
+    
+
     
     print(f"{dataset_name} finished!", file=sys.stderr)
 

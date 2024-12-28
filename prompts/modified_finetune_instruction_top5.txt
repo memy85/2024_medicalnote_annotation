@@ -8,17 +8,11 @@ Make sure the highest priority is assigned with a smaller number.
 We give you an example, do follow as below.
 
 
-1. key symptom or condition
-1.1 medical test related to 1
-1.2 medical test related to 1
-2. key symptom or condition
-2.1 medical test related to 2
-3. key symptom or condition
-3.1 medical test related to 3
-3.2 medical test related to 3
-4. key symptom or condition
-4.1 medical test related to 4
-4.2 medical test related to 4
-4.3 medical test related to 4
-5. key symptom or condition
-5.1 medical test related to 5
+1. key term
+1. key term
+2. key term
+3. key term
+3. key term
+4. key term
+4. key term
+5. key term

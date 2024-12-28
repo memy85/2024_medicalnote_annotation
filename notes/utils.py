@@ -61,18 +61,23 @@ def load_config() :
     return Config(config)
 
 
-def format_prompt(fileids, topN) : 
+def format_prompt(fileids, topN, prompt) : 
     '''
     format prompts for the examples that are used for finetuning
     '''
 
-    with open(PROJECT_PATH.joinpath("data/processed/cv_processed_ranking_datasets.pkl"), 'rb') as f :
+    with open(PROJECT_PATH.joinpath("data/processed/cv_processed_ranking_datasets_new.pkl"), 'rb') as f :
         _, top10_dataset, notes = pickle.load(f)
     # get the EHR note
 
-    with open(PROMPT_PATH.joinpath("finetune_instruction.txt"), 'r') as f :
-        instruction = f.read()
-    instruction = instruction.format(topN=topN)
+    if prompt == "modified" :
+        with open(PROMPT_PATH.joinpath(f"{prompt}_finetune_instruction_top{topN}.txt"), 'r') as f :
+            instruction = f.read()
+    else :
+        with open(PROMPT_PATH.joinpath(f"finetune_instruction_top{topN}.txt"), 'r') as f :
+            instruction = f.read()
+
+    # instruction = instruction.format(topN=topN)
 
     parsed_dataset = []
     for fileid in fileids : 

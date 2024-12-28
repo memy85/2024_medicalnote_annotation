@@ -7,11 +7,9 @@ Do not modify or abbreviate what is written in the notes. Just extract them as t
 Make sure the highest priority is assigned with a smaller number.
 We give you an example, do follow as below.
 
-1. key symptom or condition
-1.1 medical test related to 1
-1.2 medical test related to 1
-2. key symptom or condition
-2.1 medical test related to 2
-3. key symptom or condition
-3.1 medical test related to 3
-3.2 medical test related to 3
+1. key term
+1. key term
+2. key term
+3. key term
+3. key term
+

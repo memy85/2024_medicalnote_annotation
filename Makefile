@@ -1,13 +1,12 @@
 
 CUDA_DEVICE_ORDER := PCI_BUS_ID
 CUDA_LAUNCH_BLOCKING := 1
-CUDA_VISIBLE_DEVICES := 0,1
+CUDA_VISIBLE_DEVICES := 5,6
 TORCH_EXTENSIONS_DIR :=/home/zhichaoyang/.cache/torch_extensions
 
 export CUDA_DEVICE_ORDER
 export CUDA_VISIBLE_DEVICES
 export TORCH_EXTENSIONS_DIR
-
 
 
 finetune_mistral_on_mimic : 
@@ -129,6 +128,35 @@ finetune_biomistral_avigon_modified_on_mimic :
 	  > logs/finetune_biomistral7b_avigon_on_mimic.log
 
 
+finetune_biomistral7b_avigon_modified : 
+	python3 src/finetune_models.py \
+	--model_name_or_path biomistral7b_avigon \
+	--data_path data/processed/modified_discharge_dataset.json \
+	--bf16 False \
+	--use_fast_tokenizer False \
+	--output_dir ./models/biomistral7b_avigon_augmented_modified_$$number \
+	--log_level debug \
+	--logging_dir ./logs/models/biomistral7b_avigon_modified/logs \
+	--num_train_epochs 60 \
+	--per_device_train_batch_size 1 \
+	--gradient_accumulation_steps 128 \
+	--model_max_length 20000 \
+	--evaluation_strategy "no" \
+	--save_strategy "steps" \
+	--save_steps 10 \
+	--logging_steps 1 \
+	--save_total_limit 100 \
+	--learning_rate 3e-4 \
+	--weight_decay 0.0 \
+	--warmup_steps 200 \
+	--do_lora True \
+	--lora_r 64 \
+	--lora_target_modules "q_proj,v_proj,k_proj,o_proj" \
+	--gradient_checkpointing True \
+	--load_in_8bit False \
+	--report_to tensorboard \
+	> logs/finetune_biomistral7b_avigon_modified.log ;\
+
 finetune_llama31_on_mimic : 
 	python3 src/finetune_models.py \
 	  --model_name_or_path llama31 \
@@ -160,7 +188,7 @@ finetune_llama31_on_mimic :
 
 
 finetune_biomistral7b_increment : 
-	for number in 1000 ; do \
+	for number in 10 100 1000 ; do \
 		python3 src/finetune_models.py \
 		--model_name_or_path biomistral7b_avigon \
 		--data_path data/processed/modified_discharge_dataset_augmented_$$number.json \
@@ -190,22 +218,34 @@ finetune_biomistral7b_increment :
 		> logs/finetune_biomistral7b_avigon_on_mimic.log ;\
 	done
 
-finetune_biomistral7b_avigon_modified : 
-	python3 src/finetune_models.py \
-	--model_name_or_path biomistral7b_avigon \
-	--data_path data/processed/modified_discharge_dataset.json \
+#################### ----------------------------------------------- ####################
+#################### --------------------------------------------------- Following the protocol
+# ifeq ($(shell expr $step \< 10 ),1) 
+# 	$(eval $step = 10)
+# endif
+
+define finetune_mimic
+$(eval $MODEL_NAME = $(1))
+$(eval $cnt = $(2))
+$(eval $step = $(shell expr $(cnt) / 128))
+$(if $(shell expr $step \< 10), $(eval $step=10))
+
+
+python3 src/finetune_models.py \
+	--model_name_or_path ${$MODEL_NAME}\
+	--data_path data/processed/discharge_dataset_${$cnt}.json \
 	--bf16 False \
 	--use_fast_tokenizer False \
-	--output_dir ./models/biomistral7b_avigon_augmented_modified_$$number \
+	--output_dir ./models/${$MODEL_NAME}_mimic_${$cnt} \
 	--log_level debug \
-	--logging_dir ./logs/models/biomistral7b_avigon_modified/logs \
-	--num_train_epochs 60 \
+	--logging_dir ./logs/models/${$MODEL_NAME}_mimic/logs \
+	--num_train_epochs 70 \
 	--per_device_train_batch_size 1 \
 	--gradient_accumulation_steps 128 \
 	--model_max_length 20000 \
 	--evaluation_strategy "no" \
 	--save_strategy "steps" \
-	--save_steps 10 \
+	--save_steps ${$step} \
 	--logging_steps 1 \
 	--save_total_limit 100 \
 	--learning_rate 3e-4 \
@@ -217,141 +257,101 @@ finetune_biomistral7b_avigon_modified :
 	--gradient_checkpointing True \
 	--load_in_8bit False \
 	--report_to tensorboard \
-	> logs/finetune_biomistral7b_avigon_modified.log ;\
+	> logs/finetune_${$MODEL_NAME}_on_mimic.log
 
+endef
+
+define finetune
+$(eval $MODEL_NAME = $(1))
+
+python3 src/finetune_for_each_cv.py --model ${$MODEL_NAME} > ./logs/${$MODEL_NAME}_finetune.log 2>&1
+endef 
+
+define protocol_finetune
+$(eval $MODEL_NAME = $(1))
+echo "----------- FINETUNING WITH ${$MODEL_NAME} ------------"
+
+$(foreach shot, zeroshot fewshot,\
+	$(foreach topn, top3 top5 top10, \
+		$(call finetune, $($MODEL_NAME), $(shot), $(topn), general);\
+		$(call finetune, $($MODEL_NAME), $(shot), $(topn), modified);\
+	)\
+)
+
+endef
+
+define protocol_cv
+$(eval $MODEL_NAME = $(1))
+$(eval $FINETUNE = $(2))
+
+echo "----------- CV WITH ${$MODEL_NAME} ------------"
+$(foreach shot, zeroshot fewshot, \
+	$(foreach topn, top3 top5 top10, \
+		$(foreach prompt_name, "modified" "", \
+			echo "Starting $(shot), $(topn) $(prompt_name) with ${$MODEL_NAME} + ${$FINETUNE}"
+			python3 src/cross_validation.py --model $($MODEL_NAME) --inference $(shot) --topn $(topn) --finetune $($FINETUNE) --just_evaluation True --prompt_name $(prompt_name); \
+			python3 -c "from src.utils import * ; send_line_message('finished $(shot) $(topn) $(prompt_name) with ${$MODEL_NAME}');"
+		)\
+	)\
+)
+endef
+
+define protocol_test
+$(eval $MODEL_NAME = $(1))
+
+echo "----------- TEST WITH ${$MODEL_NAME} ------------"
+
+for shot in zershot fewshot; do \
+	echo $$shot ;\
+done;
+
+endef
+
+define protocol_increment
+$(eval $MODEL_NAME = $(1))
+
+$(foreach cnt, 1000 10000, $(call finetune_mimic, $($MODEL_NAME), $(cnt)))
+endef
+
+
+
+#################### ----------------------------------------------- ####################
+#################### --------------------------------------------------- Fine-Tune
+
+finetune_mistral7b : 
+	$(call finetune, mistral7b)
+
+finetune_biomistral7b_avigon : 
+	$(call finetune, biomistral7b_avigon)
+
+finetune_llama31 : 
+	$(call finetune, llama31)
 
 #################### ----------------------------------------------- ####################
 #################### --------------------------------------------------- Cross-Validation
 
-cv_no_finetune :
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference zeroshot --topn top3 --save_name mistral7b --max_new_token 200 > ./logs/mistral7b_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference fewshot --topn top3 --save_name mistral7b --max_new_token 200 > ./logs/mistral7b_top3_fewshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune False --inference zeroshot --topn top3 --save_name biomistral7b_avigon --max_new_token 200 > ./logs/biomistral7b_avigon_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune False --inference fewshot --topn top3 --save_name biomistral7b_avigon --max_new_token 200 > ./logs/biomistral7b_avigon_top3_fewshot.log 2>&1
+cv_protocol : cv_mistral7b cv_mistral7b_finetuned cv_biomistral7b_avigon cv_biomistral7b_avigon_finetuned cv_llama31 cv_llama31_finetuned
 
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference zeroshot --topn top5 --save_name mistral7b --max_new_token 200 > ./logs/mistral7b_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference fewshot --topn top5 --save_name mistral7b --max_new_token 200 > ./logs/mistral7b_top5_fewshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune False --inference zeroshot --topn top5 --save_name biomistral7b_avigon --max_new_token 200 > ./logs/biomistral7b_avigon_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune False --inference fewshot --topn top5 --save_name biomistral7b_avigon --max_new_token 200 > ./logs/biomistral7b_avigon_top5_fewshot.log 2>&1
+cv_mistral7b : 
+	$(call protocol_cv, mistral7b, False)
 
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference zeroshot --topn top10 --save_name mistral7b --max_new_token 400 > ./logs/mistral7b_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference fewshot --topn top10 --save_name mistral7b --max_new_token 400 > ./logs/mistral7b_top10_fewshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune False --inference zeroshot --topn top10 --save_name biomistral7b_avigon --max_new_token 400 > ./logs/biomistral7b_avigon_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune False --inference fewshot --topn top10 --save_name biomistral7b_avigon --max_new_token 400 > ./logs/biomistral7b_avigon_top10_fewshot.log 2>&1
+cv_mistral7b_finetuned : models/mistral7b_finetuned_cv0/checkpoint-50 models/mistral7b_finetuned_cv1/checkpoint-50 models/mistral7b_finetuned_cv2/checkpoint-50 models/mistral7b_finetuned_cv3/checkpoint-50 models/mistral7b_finetuned_cv4/checkpoint-50
+	$(call protocol_cv, mistral7b, True)
 
-cv_finetune_rank3 :
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference zeroshot --topn top3 --save_name mistral7b_finetune --max_new_token 200 > ./logs/mistral7b_finetune_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference fewshot --topn top3 --save_name mistral7b_finetune --max_new_token 200 > ./logs/mistral7b_finetune_top3_fewshot.log 2>&1
+cv_biomistral7b_avigon :
+	$(call protocol_cv, biomistral7b_avigon, False)
 
-	python3 src/cross_validation.py --model biomistral7b --finetune True --inference zeroshot --topn top3 --save_name biomistral7b_finetune --max_new_token 200 > ./logs/biomistral7b_finetune_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b --finetune True --inference fewshot --topn top3 --save_name biomistral7b_finetune --max_new_token 200 > ./logs/biomistral7b_finetune_top3_fewshot.log 2>&1
+cv_biomistral7b_avigon_finetuned : models/biomistral7b_avigon_finetuned_cv0/checkpoint-50 models/biomistral7b_avigon_finetuned_cv1/checkpoint-50 models/biomistral7b_avigon_finetuned_cv2/checkpoint-50 models/biomistral7b_avigon_finetuned_cv3/checkpoint-50 models/biomistral7b_avigon_finetuned_cv4/checkpoint-50
+	$(call protocol_cv, biomistral7b_avigon, True)
 
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference zeroshot --topn top3 --save_name biomistral7b_avigon_finetune --max_new_token 200 > ./logs/biomistral7b_avigon_finetune_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference fewshot --topn top3 --save_name biomistral7b_avigon_finetune --max_new_token 200 > ./logs/biomistral7b_avigon_finetune_top3_fewshot.log 2>&1
+cv_llama31 :
+	$(call protocol_cv, llama31, False)
 
-cv_finetune_rank5 :
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference zeroshot --topn top5 --save_name mistral7b --max_new_token 200 > ./logs/mistral7b_finetune_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference fewshot --topn top5 --save_name mistral7b --max_new_token 200 > ./logs/mistral7b_finetune_top5_fewshot.log 2>&1
+cv_llama31_finetuned : models/llama31_finetuned_cv0/checkpoint-50 models/llama31_finetuned_cv1/checkpoint-50 models/llama31_finetuned_cv2/checkpoint-50 models/llama31_finetuned_cv3/checkpoint-50 models/llama31_finetuned_cv4/checkpoint-50
+	$(call protocol_cv, llama31, True)
 
-	python3 src/cross_validation.py --model biomistral7b --finetune True --inference zeroshot --topn top5 --save_name biomistral7b --max_new_token 200 > ./logs/biomistral7b_finetune_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b --finetune True --inference fewshot --topn top5 --save_name biomistral7b --max_new_token 200 > ./logs/biomistral7b_finetune_top5_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference zeroshot --topn top5 --save_name biomistral7b_avigon --max_new_token 200 > ./logs/biomistral7b_avigon_finetune_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference fewshot --topn top5 --save_name biomistral7b_avigon --max_new_token 200 > ./logs/biomistral7b_avigon_finetune_top5_fewshot.log 2>&1
-
-cv_finetune_rank10 :
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference zeroshot --topn top10 --save_name mistral7b --max_new_token 400 > ./logs/mistral7b_finetune_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference fewshot --topn top10 --save_name mistral7b --max_new_token 400 > ./logs/mistral7b_finetune_top10_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model biomistral7b --finetune True --inference zeroshot --topn top10 --save_name biomistral7b --max_new_token 400 > ./logs/biomistral7b_finetune_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b --finetune True --inference fewshot --topn top10 --save_name biomistral7b --max_new_token 400 > ./logs/biomistral7b_finetune_top10_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference zeroshot --topn top10 --save_name biomistral7b_avigon --max_new_token 400 > ./logs/biomistral7b_avigon_finetune_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference fewshot --topn top10 --save_name biomistral7b_avigon --max_new_token 400 > ./logs/biomistral7b_avigon_finetune_top10_fewshot.log 2>&1
-
-
-cv_finetune_all : cv_finetune_rank3 cv_finetune_rank5 cv_finetune_rank10
-
-
-cv_finetuned_rank3 :
-	python3 src/cross_validation.py --model mistral7b --finetune True --just_evaluation True --inference zeroshot --topn top3 --save_name mistral7b_finetune --max_new_token 200 > ./logs/mistral7b_finetune_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune True --just_evaluation True --inference fewshot --topn top3 --save_name mistral7b_finetune --max_new_token 200 > ./logs/mistral7b_finetune_top3_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --just_evaluation True --inference zeroshot --topn top3 --save_name biomistral7b_avigon_finetune --max_new_token 200 > ./logs/biomistral7b_avigon_finetune_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --just_evaluation True --inference fewshot --topn top3 --save_name biomistral7b_avigon_finetune --max_new_token 200 > ./logs/biomistral7b_avigon_finetune_top3_fewshot.log 2>&1
-
-cv_finetuned_rank5 :
-	python3 src/cross_validation.py --model mistral7b --finetune True --just_evaluation True --inference zeroshot --topn top5 --save_name mistral7b_finetune --max_new_token 200 > ./logs/mistral7b_finetune_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune True --just_evaluation True --inference fewshot --topn top5 --save_name mistral7b_finetune --max_new_token 200 > ./logs/mistral7b_finetune_top5_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --just_evaluation True --inference zeroshot --topn top5 --save_name biomistral7b_avigon_finetune --max_new_token 200 > ./logs/biomistral7b_avigon_finetune_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --just_evaluation True --inference fewshot --topn top5 --save_name biomistral7b_avigon_finetune --max_new_token 200 > ./logs/biomistral7b_avigon_finetune_top5_fewshot.log 2>&1
-
-cv_finetuned_rank10 :
-	python3 src/cross_validation.py --model mistral7b --finetune True --just_evaluation True --inference zeroshot --topn top10 --save_name mistral7b_finetune --max_new_token 400 > ./logs/mistral7b_finetune_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune True --just_evaluation True --inference fewshot --topn top10 --save_name mistral7b_finetune --max_new_token 400 > ./logs/mistral7b_finetune_top10_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --just_evaluation True --inference zeroshot --topn top10 --save_name biomistral7b_avigon_finetune --max_new_token 400 > ./logs/biomistral7b_avigon_finetune_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --just_evaluation True --inference fewshot --topn top10 --save_name biomistral7b_avigon_finetune --max_new_token 400 > ./logs/biomistral7b_avigon_finetune_top10_fewshot.log 2>&1
-
-
-cv_finetuned_all : cv_finetuned_rank3 cv_finetuned_rank5 cv_finetuned_rank10
-
-
-cv_mistral_mimic_finetune :
-	python3 src/cross_validation.py --model mistral7b_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top3 --save_name mistral7b_mimic --max_new_token 200 > ./logs/mistral7b_mimic_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top3 --save_name mistral7b_mimic --max_new_token 200 > ./logs/mistral7b_mimic_top3_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model mistral7b_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top5 --save_name mistral7b_mimic --max_new_token 200 > ./logs/mistral7b_mimic_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top5 --save_name mistral7b_mimic --max_new_token 200 > ./logs/mistral7b_mimic_top5_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model mistral7b_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top10 --save_name mistral7b_mimic --max_new_token 400 > ./logs/mistral7b_mimic_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top10 --save_name mistral7b_mimic --max_new_token 400 > ./logs/mistral7b_mimic_top10_fewshot.log 2>&1
-
-cv_biomistral_mimic_finetune :
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top3 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top3 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top3_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top5 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top5 --save_name biomistral7b_mimic --max_new_token 200 > ./logs/biomistral7b_mimic_top5_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference zeroshot --topn top10 --save_name biomistral7b_mimic --max_new_token 400 > ./logs/biomistral7b_mimic_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_finetuned --finetune False --just_evaluation True --inference fewshot --topn top10 --save_name biomistral7b_mimic --max_new_token 400 > ./logs/biomistral7b_mimic_top10_fewshot.log 2>&1
-
-
-modified_cv_finetune :
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference zeroshot --topn top3 --save_name mistral7b_modified_finetune --max_new_token 200 --prompt_name modified > ./logs/mistral7b_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference fewshot --topn top3 --save_name mistral7b_modified_finetune --max_new_token 200 --prompt_name modified > ./logs/mistral7b_top3_fewshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference zeroshot --topn top3 --save_name biomistral7b_avigon_modified_finetune --max_new_token 200 --prompt_name modified > ./logs/biomistral7b_avigon_top3_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference fewshot --topn top3 --save_name biomistral7b_avigon_modified_finetune --max_new_token 200 --prompt_name modified > ./logs/biomistral7b_avigon_top3_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference zeroshot --topn top5 --save_name mistral7b_modified_finetune --max_new_token 200 --prompt_name modified > ./logs/mistral7b_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference fewshot --topn top5 --save_name mistral7b_modified_finetune --max_new_token 200 --prompt_name modified > ./logs/mistral7b_top5_fewshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference zeroshot --topn top5 --save_name biomistral7b_avigon_modified_finetune --max_new_token 200 --prompt_name modified > ./logs/biomistral7b_avigon_top5_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference fewshot --topn top5 --save_name biomistral7b_avigon_modified_finetune --max_new_token 200 --prompt_name modified > ./logs/biomistral7b_avigon_top5_fewshot.log 2>&1
-
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference zeroshot --topn top10 --save_name mistral7b_modified_finetune --max_new_token 500 --prompt_name modified > ./logs/mistral7b_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune True --inference fewshot --topn top10 --save_name mistral7b_modified_finetune --max_new_token 500 --prompt_name modified > ./logs/mistral7b_top10_fewshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference zeroshot --topn top10 --save_name biomistral7b_avigon_modified_finetune --max_new_token 500 --prompt_name modified > ./logs/biomistral7b_avigon_top10_zeroshot.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon --finetune True --inference fewshot --topn top10 --save_name biomistral7b_avigon_modified_finetune --max_new_token 500 --prompt_name modified > ./logs/biomistral7b_avigon_top10_fewshot.log 2>&1
-
-	python3 -c "from src.utils import * ; send_line_message('finished modified_cv_finetune top 10');"
-
-modified_cv_mimic_finetune :
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference zeroshot --topn top3 --save_name mistral7b_modified_mimic_finetune --max_new_token 200 --prompt_name modified > ./logs/mistral7b_modified_mimic_finetune.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference fewshot --topn top3 --save_name mistral7b_modified_mimic_finetune --max_new_token 200 --prompt_name modified > ./logs/mistral7b_modified_mimic_finetune.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_modified --finetune False --inference zeroshot --topn top3 --save_name biomistral7b_avigon_modified_mimic_finetune --max_new_token 200 --prompt_name modified > ./logs/biomistral7b_avigon_modified_mimic_finetune.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_modified --finetune False --inference fewshot --topn top3 --save_name biomistral7b_avigon_modified_mimic_finetune --max_new_token 200 --prompt_name modified > ./logs/biomistral7b_avigon_modified_mimic_finetune.log 2>&1
-
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference zeroshot --topn top5 --save_name mistral7b_modified_mimic_finetune --max_new_token 200 --prompt_name modified > ./logs/mistral7b_modified_mimic_finetune.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference fewshot --topn top5 --save_name mistral7b_modified_mimic_finetune --max_new_token 200 --prompt_name modified > ./logs/mistral7b_modified_mimic_finetune.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_modified --finetune False --inference zeroshot --topn top5 --save_name biomistral7b_avigon_modified_mimic_finetune --max_new_token 200 --prompt_name modified > ./logs/biomistral7b_avigon_modified_mimic_finetune.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_modified --finetune False --inference fewshot --topn top5 --save_name biomistral7b_avigon_modified_mimic_finetune --max_new_token 200 --prompt_name modified > ./logs/biomistral7b_avigon_modified_mimic_finetune.log 2>&1
-
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference zeroshot --topn top10 --save_name mistral7b_modified_mimic_finetune --max_new_token 500 --prompt_name modified > ./logs/mistral7b_modified_mimic_finetune.log 2>&1
-	python3 src/cross_validation.py --model mistral7b --finetune False --inference fewshot --topn top10 --save_name mistral7b_modified_mimic_finetune --max_new_token 500 --prompt_name modified > ./logs/mistral7b_modified_mimic_finetune.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_modified --finetune False --inference zeroshot --topn top10 --save_name biomistral7b_avigon_modified_mimic_finetune --max_new_token 500 --prompt_name modified > ./logs/biomistral7b_avigon_modified_mimic_finetune.log 2>&1
-	python3 src/cross_validation.py --model biomistral7b_avigon_mimic_modified --finetune False --inference fewshot --topn top10 --save_name biomistral7b_avigon_modified_mimic_finetune --max_new_token 500 --prompt_name modified > ./logs/biomistral7b_avigon_modified_mimic_finetune.log 2>&1
+#################### ----------------------------------------------- ####################
+#################### --------------------------------------------------- baseline
 
 baseline_cv :
 	# python3 src/test_baseline.py --model gpt --finetune True --topn top3 --save_name gpt --max_new_token 200 > ./logs/gpt_top3.log 2>&1
@@ -362,18 +362,31 @@ baseline_cv :
 	python3 src/test_baseline.py --model biogpt --finetune True --topn top5 --save_name biogpt --max_new_token 200 > ./logs/biogpt_top5.log 2>&1
 	python3 src/test_baseline.py --model biogpt --finetune True --topn top10 --save_name biogpt --max_new_token 400 > ./logs/biogpt_top10.log 2>&1
 
-cv_biomistral_modified_mimic_all_cases :
-	for number in 1000 ; do \
-		for ranks in 3 5 10 ; do \
-			python3 src/cross_validation.py --model biomistral7b_avigon_modified_mimic$$number --finetune False --inference zeroshot --topn top$$ranks --save_name biomistral7b_avigon_modified_mimic$$number --max_new_token 300 --prompt_name modified > ./logs/biomistral7b_avigon_modified.log 2>&1; \
-			python3 src/cross_validation.py --model biomistral7b_avigon_modified_mimic$$number --finetune False --inference fewshot --topn top$$ranks --save_name biomistral7b_avigon_modified_mimic$$number --max_new_token 300 --prompt_name modified > ./logs/biomistral7b_avigon_modified.log 2>&1; \
-		done ;\
-		echo "finished for $$number";\
-	done
 
-	python3 -c "from src.utils import * ; send_line_message('finished biomistral modified mimic all cases');"
+#################### ----------------------------------------------- ####################
+#################### --------------------------------------------------- increment finetuning
 
+increment_mistral7b :
+	$(call protocol_increment, mistral7b)
 
+increment_biomistral7b_avigon :
+	$(call protocol_increment, biomistral7b_avigon)
+
+increment_llama31 :
+	$(call protocol_increment, llama31)
+
+#################### ----------------------------------------------- ####################
+#################### --------------------------------------------------- increment cv
+
+cv_increment_mistral7b : 
+	$(foreach cnt, 10 100 1000 10000, $(call protocol_cv, mistral7b_mimic_${cnt}, True))
+
+cv_increment_llama31 : 
+	$(foreach cnt, 10 100 1000 10000, $(call protocol_cv, llama31_mimic_${cnt}, True))
+
+# =========================================================================================================================
+# --------------------------------------------------- Case Study ----------------------------------------------------------
+# =========================================================================================================================
 
 case_study :
 # 	top3,5,10
@@ -435,6 +448,3 @@ reformat_case_study :
 		echo "finished finetuned";\
 		echo "finished $$number";\
 	done
-
-test :
-	python3 -c "from src.utils import * ; send_line_message('testing');"

@@ -27,7 +27,7 @@ class Config :
     def template(self,inference, topn, **kwargs) :
 
         name = kwargs.get("prompt_name")
-        if name is not None :
+        if name is "modified" :
             template_path = PROMPT_PATH.joinpath(f'{name}_{inference}_{topn}.txt')
         else :
             template_path = PROMPT_PATH.joinpath(f'{inference}_{topn}.txt')

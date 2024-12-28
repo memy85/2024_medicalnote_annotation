@@ -22,31 +22,6 @@ selected_mimic = pd.read_pickle(SELECTED_MIMIC_DISCHARGE_PATH)
 
 def call_chatgpt(input_text, model="gpt-3.5-turbo"):
     # GPT-4 model token limit handling
-    # token_limit = 30000
-
-
-    # def split_text(text, max_tokens):
-    #     words = text.split()
-    #     chunks = []
-    #     current_chunk = []
-    #     current_token_count = 0
-
-    #     for word in words:
-    #         token_count = len(word) // 4  # Rough estimate of tokens per word (approx. 1 word ≈ 1.5 tokens)
-    #         if current_token_count + token_count > max_tokens:
-    #             chunks.append(" ".join(current_chunk))
-    #             current_chunk = [word]
-    #             current_token_count = token_count
-    #         else:
-    #             current_chunk.append(word)
-    #             current_token_count += token_count
-
-    #     if current_chunk:
-    #         chunks.append(" ".join(current_chunk))
-
-    #     return chunks
-
-    # Split the input text into manageable chunks
     input_chunks = input_text
 
     # Initialize an empty response list
