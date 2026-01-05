@@ -32,20 +32,23 @@ from utils import *
 # ipdb.set_trace()
 
 IGNORE_INDEX = -100
-DEFAULT_PAD_TOKEN = "<pad>"
-DEFAULT_EOS_TOKEN = "</s>"
-DEFAULT_BOS_TOKEN = "<s>"
-DEFAULT_UNK_TOKEN = "<unk>"
+# DEFAULT_PAD_TOKEN = "<pad>"
+# DEFAULT_EOS_TOKEN = "</s>"
+# DEFAULT_BOS_TOKEN = "<s>"
+# DEFAULT_UNK_TOKEN = "<unk>"
 PROMPT_DICT = {
+    # "prompt_input": (
+    #     "Below is an instruction that describes a task, paired with an input that provides further context. "
+    #     "Write a response that appropriately completes the request.\n\n"
+    #     "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
+    # ),
+    # "prompt_no_input": (
+    #     "Below is an instruction that describes a task. "
+    #     "Write a response that appropriately completes the request.\n\n"
+    #     "### Instruction:\n{instruction}\n\n### Response:"
+    # ),
     "prompt_input": (
-        "Below is an instruction that describes a task, paired with an input that provides further context. "
-        "Write a response that appropriately completes the request.\n\n"
-        "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
-    ),
-    "prompt_no_input": (
-        "Below is an instruction that describes a task. "
-        "Write a response that appropriately completes the request.\n\n"
-        "### Instruction:\n{instruction}\n\n### Response:"
+        "{input}"
     ),
 }
 
@@ -120,6 +123,8 @@ class TrainingArguments(transformers.TrainingArguments):
     do_lora: bool = False
     load_in_8bit: bool = False
     load_best_model_at_end: bool = False
+    deepspeed: str = None
+    resume_from_checkpoint: bool= False
 
 
 @dataclass
@@ -193,7 +198,6 @@ def preprocess(
 
     return dict(input_ids=input_ids, labels=labels)
 
-
 class SupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
@@ -222,11 +226,15 @@ class SupervisedDataset(Dataset):
         print("number of instances used: ", len(list_data_dict), 'with category: ', category)
         random.shuffle(list_data_dict)
         logging.warning("Formatting inputs...")
-        prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
+        # prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
+        prompt_input = PROMPT_DICT["prompt_input"]
 
+        # sources = [
+        #     prompt_input.format_map(example) if example.get("input", "") != "" else prompt_no_input.format_map(example)
+        #     for example in list_data_dict
+        # ]
         sources = [
-            prompt_input.format_map(example) if example.get("input", "") != "" else prompt_no_input.format_map(example)
-            for example in list_data_dict
+            prompt_input.format_map(example) for example in list_data_dict
         ]
 
         targets = [f"{example['output']}{tokenizer.eos_token}" for example in list_data_dict]
@@ -316,7 +324,7 @@ def train(args = None):
         model_path,
         cache_dir=training_args.cache_dir,
         config=config,
-        device_map="auto",
+        # device_map="cuda",
         load_in_8bit=training_args.load_in_8bit,
     )
 
@@ -358,6 +366,7 @@ def train(args = None):
             )
 
             model = get_peft_model(model, lora_config)
+            # model.to("cuda")
             model.print_trainable_parameters()
 
         else:
@@ -365,9 +374,11 @@ def train(args = None):
             model.enable_input_require_grads()
             peft_model_id = lora_args.lora_weight_path
             model = PeftModel.from_pretrained(model, peft_model_id)
+            training_args.resume_from_checkpoint=True
 
             if training_args.gradient_checkpointing:
                 model.get_input_embeddings().requires_grad_(True)
+            # model.to("cuda")
 
             # model.print_trainable_parameters()
 
@@ -378,6 +389,8 @@ def train(args = None):
 
     trainer.save_state()
     trainer.save_model(output_dir=training_args.output_dir)
+    tokenizer.save_pretrained(training_args.output_dir)
+    
     return trainer
 
 

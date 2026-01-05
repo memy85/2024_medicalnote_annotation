@@ -1,4 +1,7 @@
 
+from pandas import DataFrame
+from typing import List, Tuple, Dict
+import pandas as pd
 import pickle
 from pathlib import Path
 import os, sys
@@ -24,13 +27,11 @@ class Config :
     def model_path(self, model_name) :
         return self.file['model_path'][model_name]
     
-    def template(self,inference, topn, **kwargs) :
+    def template(self, prompt_type, shot, **kwargs) :
 
-        name = kwargs.get("prompt_name")
-        if name is "modified" :
-            template_path = PROMPT_PATH.joinpath(f'{name}_{inference}_{topn}.txt')
-        else :
-            template_path = PROMPT_PATH.joinpath(f'{inference}_{topn}.txt')
+        # name = kwargs.get("prompt_name")
+        template_path = PROMPT_PATH.joinpath(f'{prompt_type}_{shot}_top10.txt')
+        # template_path = PROMPT_PATH.joinpath(f'extraction_{shot}.txt')
 
         with open(template_path, 'r') as f :
             template = f.read()
@@ -146,4 +147,45 @@ def send_line_message(message):
         print('Message sent successfully')
     else:
         print(f'Failed to send message. Status code: {response.status_code}, Response: {response.text}')
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+def load_cv_dataset() -> Tuple[List, DataFrame, DataFrame] :
+
+    DATA_PATH = PROJECT_PATH.joinpath("data/processed")
+
+    final_cv_set = pd.read_pickle(DATA_PATH.joinpath("final_cv_set.pkl"))
+    final_notes = pd.read_json(DATA_PATH.joinpath("final_notes.json"), lines=True, orient="records") 
+    final_jargons = pd.read_json(DATA_PATH.joinpath("final_jargons.json"), lines=True, orient="records")  
+
+    return final_cv_set, final_jargons, final_notes 
+
+
+def prepare_examples(example_ids : List[str], notes : DataFrame, jargons : DataFrame) -> Dict :  
+
+    example_dict = {}
+    for idx, noteid in enumerate(example_ids) : 
+        note = notes[notes.noteid == noteid]['text'].iloc[0]
+        jargon_dataset = jargons[jargons.noteid == noteid].sort_values(by="ranking")
+
+        outputs = ""
+        for i, row in jargon_dataset.iterrows() :
+            rank = row["ranking"]
+            term = row["jargon"]
+            outputs += f"{rank}. {term}\n"
+        
+        example_dict[f"example_note{idx+1}"] = note
+        example_dict[f"example_output{idx+1}"] = outputs
+
+    return example_dict
+
+
 

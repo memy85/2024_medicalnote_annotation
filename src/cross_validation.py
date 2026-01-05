@@ -7,10 +7,11 @@ import gc
 # os.environ['CUDA_VISIBLE_DEVICES'] = "1,2,3"
 
 import torch
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, Trainer
 from peft.peft_model import PeftModel
 
 from peft.config import PeftConfig
+from peft import LoraConfig
 from datasets import Dataset
 import pandas as pd
 import torch
@@ -22,6 +23,8 @@ from utils import *
 
 import finetune_models
 import evaluate_model as em
+
+
 
 
 config = load_config()
@@ -48,6 +51,22 @@ def process_texts(samples, template) :
     return {"questions" : formated_texts}
 #%%
 
+def finetune_model(model : AutoModelForCausalLM, tokenizer : AutoTokenizer, train_set: Dataset, args) :
+
+    # we use the trainer Module to finetune
+    trainer = Trainer(model=model, 
+            tokenizer=tokenizer,
+            train_dataset=train_set,
+            args=args)
+
+    # start training
+    trainer.train()
+
+    return model
+
+
+#%%
+
 def str2bool(v):
     if isinstance(v, bool):
         return v
@@ -69,6 +88,7 @@ def parse_arguments() :
     parser.add_argument("--max_new_token", type=int, help='max token', default=200)
     parser.add_argument("--quantization", type=str, help="choose either 8 or None", default=None)
     parser.add_argument("--just_evaluation", type=str2bool, nargs='?', const=True, default=False, help="whether to do just evaluation")
+#    parser.add_argument("--checkpoint", type=int, help='checkpoint', default=40)
     parser.add_argument("--baseline", type=str2bool, nargs='?', const=True, default=False, help="whether this is a baseline model or not")
     parser.add_argument("--prompt_name", type=str, help="name of prompt", default=None)
     
@@ -86,6 +106,7 @@ if __name__ == "__main__" :
     max_new_token = args.max_new_token
     quantization = args.quantization
     just_eval_flag = args.just_evaluation
+#    checkpoint = args.checkpoint
     save_name = args.save_name
     prompt_name = args.prompt_name
     baseline_flag = args.baseline
@@ -115,11 +136,12 @@ if __name__ == "__main__" :
 
     #%%
     # ** explanation
-    # cv5 : the cross validation training set list 
+    # cv10 : the cross validation training set list 
     # top10 dataset : medical key word dataset
     # filtered_notes : the EHR notes 
-    # cv5, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_processed_ranking_datasets.pkl"))
-    cv5, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_processed_ranking_datasets_new.pkl"))
+    # cv10, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_processed_ranking_datasets.pkl"))
+
+    cv10, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_processed_ranking_datasets_10fold.pkl"))
 
     #%%
 
@@ -136,7 +158,7 @@ if __name__ == "__main__" :
     # * original data : 104 = 83 (test) + 21 (train)
     # trainset : each files that belongs to the testset
     #%%
-    for idx, trainset in enumerate(cv5) : 
+    for idx, trainset in enumerate(cv10) : 
         print(f"starting cv ------------------ {idx} ----------------", file=sys.stderr)
         # filter_dataset : the test set
         testset = dataset.filter(lambda x : x["noteid"] not in trainset)
@@ -186,7 +208,7 @@ if __name__ == "__main__" :
                 --num_train_epochs 50
                 --per_device_train_batch_size 1 
                 --gradient_accumulation_steps 128 
-                --model_max_length 20000 
+                --model_max_length 8192
                 --save_strategy steps 
                 --save_steps 10 
                 --logging_steps 1 
@@ -242,9 +264,9 @@ if __name__ == "__main__" :
             outputs.append(pred_output)
             torch.cuda.empty_cache()
 
-
-        with open(DATA_PATH.joinpath(f"{finetune_model_name}.pkl"), 'wb') as f :
-            pickle.dump(outputs,f)
+        if do_finetune :
+            with open(DATA_PATH.joinpath(f"{finetune_model_name}.pkl"), 'wb') as f :
+                pickle.dump(outputs,f)
 
 
         # ===================================================================================================== #

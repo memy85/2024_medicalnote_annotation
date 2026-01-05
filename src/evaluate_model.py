@@ -4,6 +4,7 @@ import re
 import pandas as pd
 import numpy as np
 import math
+from sklearn.metrics import roc_auc_score
 import argparse
 
 from utils import *
@@ -71,20 +72,22 @@ def calculate_precision_recall(gold, pred) :
     gold_cnt = len(gold_extracted)
 
     if pred_cnt == 0 :
-        pred_cnt = 0.001
-
-    precision_score = cnt / pred_cnt
-
+        precision_score = 0
+    else : 
+        precision_score = cnt / pred_cnt
+    
+    # clip precision
     if precision_score > 1.0 :
         precision_score = 1.0
 
     if gold_cnt == 0 :
         gold_cnt = 0.001
-
-    # recall == sensitivity
-    # RECALL == TP / (TP + FN)
-    # TP == cnt, TP + FN == gold_cnt
-    recall_score = cnt / gold_cnt 
+        recall_score = 0
+    else : 
+        recall_score = cnt / gold_cnt 
+        # recall == sensitivity
+        # RECALL == TP / (TP + FN)
+        # TP == cnt, TP + FN == gold_cnt
 
     # FPR == FP / (FP + TN)
     # FP == wrong_cnt, FP + TN == wrong_cnt + 
@@ -126,18 +129,38 @@ def calculate_map(gold, pred):
     
     precisions = []
     pred_cnt = 0
+
     m = len(pred_extracted)
     if m < 1 :
         return 0
+    
+    gold_ranks = []
+    pred_ranks = []
     for i, pred_element in enumerate(pred_extracted) : 
         for j, gold_element in enumerate(gold_extracted) :
             if (gold_element.lower() in pred_element.lower()) & (int(pred[i][0]) == int(gold[j][0])) :
+
                 pred_cnt += 1
                 precisions.append((pred_cnt)/(i+1))
                 break
 
+            # if gold_element.lower() in pred_element.lower() :
+
+
+                # pred_ranks.append(int(pred[i][0]))
+                # gold_ranks.append(int(gold[j][0]))
+
+
         precisions.append(pred_cnt/(i+1))
+    # print("prediction rank : ", pred_ranks)
+    # print("gold rank : ", gold_ranks)
+
+    # if len(gold_ranks) < 1 or len(pred_ranks) < 1 :
+        # return 0
+
+    # roc_score = roc_auc_score(gold_ranks, pred_ranks, multi_class="ovr" ,average="macro")
     return sum(precisions) * (1/m)
+    # return roc_score
 
 
 def get_results(gold_dataset, pred_dataset, testset_ids, rank) :
@@ -153,9 +176,11 @@ def get_results(gold_dataset, pred_dataset, testset_ids, rank) :
     recalls = []
     mrrs = []
     maps = []
+    # aucs = []
+    f1s = []
     for idx, fileid in enumerate(fileids) : 
         # process gold labels
-        gold = gold_dataset[gold_dataset.fileid == fileid][['ranking', 'phrase']].copy()
+        gold = gold_dataset[gold_dataset.noteid == fileid][['ranking', 'jargon']].copy()
         gold['ranking'] = gold['ranking'].apply(lambda x : int(p.findall(str(x))[0]))
         gold = [tuple(x) for x in gold.to_numpy()]
 
@@ -166,25 +191,41 @@ def get_results(gold_dataset, pred_dataset, testset_ids, rank) :
         precision, recall = calculate_precision_recall(gold, pred)
         mrr = calculate_mrr(gold, pred)
 
+        # calculate F1 score
+        if (precision + recall) == 0 :
+            f1 = 0
+        else : 
+            f1 = (2 * precision * recall) / (precision + recall)
+
         # calculate MAP
         map = calculate_map(gold, pred)
 
         precisions.append(precision)
         recalls.append(recall)
+        f1s.append(f1)
         mrrs.append(mrr)
         maps.append(map)
+        # aucs.append(auc)
     
     p_avg = round(np.array(precisions).mean(),3)
     r_avg = round(np.array(recalls).mean(), 3)
-    f1_avg = round(2*p_avg*r_avg/(p_avg+r_avg),3)
+    f1_avg = round(np.array(f1s).mean(), 3)
+
+    # if (p_avg+r_avg) == 0.0 :
+    #     f1_avg = 0
+    # else : 
+    #     f1_avg = round(2*p_avg*r_avg/(p_avg+r_avg),3)
+
     m_avg = round(np.array(mrrs).mean(),3)
     map_avg = round(np.array(maps).mean(), 3)
+    # auc_avg = round(np.array(aucs).mean(), 3)
 
     print("The F1 score is %.3f" %f1_avg)
     print("The precision is %.3f" %p_avg)
     print("The recall is %.3f" %r_avg)
     print("The mrr is %.3f" %m_avg)
     print("The map is %.3f" %map_avg)
+    # print("The auc is %.3f" %auc_avg)
 
     return p_avg, r_avg, f1_avg, m_avg, map_avg
 

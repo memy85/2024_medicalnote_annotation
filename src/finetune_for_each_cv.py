@@ -97,7 +97,8 @@ if __name__ == "__main__" :
     # cv5 : the cross validation training set list 
     # top10 dataset : medical key word dataset
     # filtered_notes : the EHR notes 
-    cv5, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_processed_ranking_datasets_new.pkl"))
+    # cv5, top10_dataset, filtered_notes = pd.read_pickle(DATA_PATH.joinpath("cv_processed_ranking_datasets_new.pkl"))
+    cv10, top10_dataset, filtered_notes = load_cv_dataset()
 
     #%%
 
@@ -114,16 +115,16 @@ if __name__ == "__main__" :
     # * original data : 104 = 83 (test) + 21 (train)
     # trainset : each files that belongs to the testset
     #%%
-    for idx, trainset in enumerate(cv5) : 
-        if idx < 4 : 
-            continue
+    for cv_idx, (train_idx, test_idx) in enumerate(cv10) : 
+        # if idx < 4 : 
+        #     continue
         print(f"----------- ------------------ {idx} ----------------", file=sys.stderr)
         print(f"starting cv ------------------ {idx} ----------------", file=sys.stderr)
         print(f"----------- ------------------ {idx} ----------------", file=sys.stderr)
 
         # ** do finetuning if we have finetune flag
         # these are the train set (21 files)
-        dataset_name = f"cv{idx}"
+        dataset_name = f"cv{cv_idx}"
 
         # ** Name of the finetuned model
         print("doing finetuning", file=sys.stderr)
