@@ -1,0 +1,42 @@
+
+### Instruction:
+You are a helpful assistant, an expert in medical domain. 
+Extract top 10 important key terms mentioned in the medical note for the patient 
+If you think they are of same importance, they can have the same ranking.
+Do not write no symptoms, or any indication that there is no other diagnosis/symptoms or conditions.
+Do not modify or abbreviate what is written in the notes. Just extract them as they are.
+Make sure the highest priority is assigned with a smaller number.
+We give you an example, do follow as below.
+
+1. key term
+1. key term
+2. key term
+3. key term
+3. key term
+4. key term
+5. key term
+5. key term
+6. key term
+7. key term
+7. key term
+8. key term
+9. key term
+10. key term
+
+### Context : 
+{example_note1}
+
+### Response : 
+{example_output1}
+
+### Context : 
+{example_note2}
+
+### Response : 
+{example_output2}
+
+### Context : 
+{note}
+
+### Response : 
+
